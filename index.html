@@ -10,7 +10,8 @@
             box-sizing: border-box;
             -webkit-touch-callout:none;                /* prevent callout to copy image, etc when tap to hold */
             -webkit-tap-highlight-color:rgba(0,0,0,0); /* prevent tap highlight color / shadow */
-            -webkit-user-select:none;                  /* prevent copy paste, to allow, change 'none' to 'text' */
+            -webkit-user-select:none;   
+            touch-action: none;               /* prevent copy paste, to allow, change 'none' to 'text' */
         }
         body {
             touch-action: none;
@@ -18,9 +19,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
             background-color: #f0f0f0;
             padding-bottom: 120px;
+            height: 100vh;
         }
 
         /* All content goes inside this element */
@@ -44,9 +45,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 20px; /* Increased gap for better touch interaction */
-            margin-top: 20px; /* Increased margin for better spacing */
-            margin-bottom: 20px; /* Increased margin for better spacing */
+            height: max-content;
             }   
         
 
