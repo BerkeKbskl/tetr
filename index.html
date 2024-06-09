@@ -8,10 +8,10 @@
             padding: 0;
             margin: 0;
             box-sizing: border-box;
+            -webkit-touch-callout:none;                /* prevent callout to copy image, etc when tap to hold */
+            -webkit-tap-highlight-color:rgba(0,0,0,0); /* prevent tap highlight color / shadow */
+            -webkit-user-select:none;                  /* prevent copy paste, to allow, change 'none' to 'text' */
         }
-
-
-
         body {
             touch-action: none;
             display: flex;
@@ -20,59 +20,102 @@
             justify-content: center;
             height: 100vh;
             background-color: #f0f0f0;
+            padding-bottom: 120px;
+        }
+
+        /* All content goes inside this element */
+        .safe-area-view {
+        flex-grow: 1;
+        overflow: auto;
         }
 
         canvas {
-            background: #9a9a9a;
-            display: block;
-            margin: 0 auto;
-            border: 2px solid black;
-            
-            height: calc(100% - 120px); /* Adjust based on button height */
-        }
+        background: #9a9a9a;
+        display: block;
+        margin: 0 auto;
+        border: 2px solid black;
+        max-width: max-content;
+        height: calc(100vh - 200px); /* Adjust based on button height */
+        margin-bottom: 20px;
+        margin-top: 20px;
+     }
 
+        .buttons-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px; /* Increased gap for better touch interaction */
+            margin-top: 20px; /* Increased margin for better spacing */
+            margin-bottom: 20px; /* Increased margin for better spacing */
+            }   
         
+
 
    
-          .buttons-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 10px; /* Increased gap for better touch interaction */
-          margin-top: 10px; /* Increased margin for better spacing */
-        }
-        
-
         button {
-            padding: 30px 32px; /* Increased button size */
-            font-size: xx-large; /* Adjusted font size for better visibility */
-            font-weight: bold;
-            background-color: #b3b3b3;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 8px; /* Added border radius for rounded corners */
+        appearance: button;
+        background-color: #000;
+        background-image: none;
+        border: 1px solid #000;
+        border-radius: 8px;
+        box-shadow:#fff 8px 8px 0 0,#000 8px 8px 0 2px;
+        box-sizing: border-box;
+        color: #fff;
+        cursor: pointer;
+        display: inline-block;
+        font-family: ITCAvantGardeStd-Bk,Arial,sans-serif;
+        font-size: 32px;
+        font-weight: 800;
+        margin: 0 15px 20px 0;
+        overflow: visible;
+        padding: 50px 70px;
+        text-align: center;
+        text-transform: none;
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
+        vertical-align: middle;
+        white-space: nowrap;
+        }
+
+        button:focus {
+        text-decoration: none;
         }
 
         button:hover {
-            background-color: #45a049;
+        text-decoration: none;
         }
+
+        button:active {
+        box-shadow: rgba(0, 0, 0, .125) 0 3px 5px inset;
+        outline: 0;
+        }
+
+        button:not([disabled]):active {
+        box-shadow: #fff 2px 2px 0 0, #000 2px 2px 0 1px;
+        transform: translate(2px, 2px);
+        }
+
+
+        
     </style>
 </head>
 <body>
-    <button id="run">🚩</button>
-    <canvas height="800px" width="600px" id="myCanvas"></canvas>
-    <div id="buttons-container">
-        <button id="btnLeft">⬅️</button>
-        <button id="btnRight">➡️</button>
-        <button id="btnDown">⬇️</button>
-        <button id="btnHardDrop">⏬</button>
-        <button id="btnRotate">🔄</button>
-        <button id="btnHold">⏺️</button>
-        
-        <button id="pause">⏸️</button>
-    </div>
     
+    <canvas height="800px" width="620px" id="myCanvas"></canvas>
+    <div id="buttons-container">
+        <button id="btnLeft"><-</button>
+        <button id="btnRight">-></button>
+        <button id="btnDown">↓</button>
+        <button id="btnHardDrop">↓↓</button>
+        <button id="btnRotate">↻</button>
+    </div>    
+    <div id="buttons-container"> 
+        <button id="btnHold">hold</button>
+        <button id="run">start</button>
+        <button id="pause">pause</button>
+    
+    </div> 
     <script >
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -91,6 +134,9 @@ const hTile = 20;
 const bs = 40; // size
 
 let speed = 1200;
+
+let lastLineCleared = 0;
+let combo = 0;
 
 // tetrominos
 let currentTetro;
@@ -210,8 +256,7 @@ function drop() {
 
 
 function hardDrop(tetro) {
-    // Clear the existing interval
-    clearInterval(gameInterval);
+
 
     while (!checkCollision(tetro, 0, 1)) {
         tetro.tl[1] += 1;
@@ -258,6 +303,8 @@ function holdTetro() {
         hold = temp;
         popQueue();
     }
+    hold.tl = [4,0];
+    currentTetro.tl = [4,0];
 }
 
 function endGame() {
@@ -317,11 +364,13 @@ function clearLine() {
         for (let j = 0; j < wTile; j++) {
             if (gameArray[i][j] == null) {
                 allBlock = false;
+                combo = 0;
                 break;
-            }
+            }        
         }
         if (allBlock) {
             clearedLineCount++;
+            combo++;
             for (let a = i; a > 0; a--) {
                 for (let b = 0; b < wTile; b++) {
                     gameArray[a][b] = gameArray[a - 1][b];
@@ -335,16 +384,16 @@ function clearLine() {
     
 
     if (clearedLineCount == 1) {
-        score = 100 * level;
+        score += 100 * level;
     }
     if (clearedLineCount == 2) {
-        score = 300 * level;
+        score += 300 * level;
     }
     if (clearedLineCount == 3) {
-        score = 500 * level;
+        score += 500 * level;
     }
     if (clearedLineCount == 4) {
-        score = 800 * level;
+        score += 800 * level;
         // tetris
     }
 
@@ -356,6 +405,10 @@ function clearLine() {
     }    
     
     lines += clearedLineCount;
+    lastLineCleared = clearedLineCount;
+    
+    if (combo > 0)
+    score += (combo-1) * 50 * level;
 }
 
 function drawScore() {
@@ -430,7 +483,6 @@ document.getElementById("run").addEventListener("click", function () {
 });
 
 document.getElementById("btnLeft").addEventListener("click", function () {
-    console.log("hh")
     if (!checkCollision(currentTetro, -1, 0)) {
         currentTetro.tl[0] -= 1;
     }
@@ -511,6 +563,10 @@ function keyDownHandler(e) {
         
     }
 }
+
+
+
+
 });
 
 
