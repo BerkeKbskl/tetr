@@ -90,7 +90,7 @@
             let dashPos = [];
 
 
-            
+
             const buttonImage = new Image();
             buttonImage.src = 'button.png';
 
@@ -154,7 +154,7 @@
                 // Draw ghost tetromino
                 let ghost = JSON.parse(JSON.stringify(tetromino));
                 calcGhost(ghost);
-                
+
                 for (let i = 0; i < ghost.positions.length; i++) {
                     drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs, (ghost.positions[i][1] + ghost.tl[1]) * bs, ghost.color, 0.2);
                 }
@@ -188,6 +188,8 @@
                 speed = 1200;
                 drawInterval = setInterval(draw, 16);
                 gameInterval = setInterval(drop, speed);
+
+               
             }
 
             let soft = 1;
@@ -280,7 +282,7 @@
             }
 
             function hardDrop(tetro) {
-                
+
                 if (isSoftLocked) {
                     resetSoftLock();
                     hardDrop(tetro);
@@ -650,6 +652,8 @@
                 ctx.fill();
 
                 drawScore();
+                drawButtons();
+
 
                 // Draw tetrominoes from the array
                 for (let i = 0; i < hTile; i++) {
@@ -679,7 +683,6 @@
                 drawNext(hold, cw * 0.77, ch * 0.27);
                 drawTetromino(currentTetro);
 
-                drawButtons();
 
                 // Draw message and points
                 ctx.fillStyle = "white";
@@ -713,6 +716,127 @@
             const buttonColor = "black";
             const buttonMargin = cw * 0.01;
 
+            // Array to hold button objects
+            const buttons = [
+                { label: "⬅️ Left", action: moveLeft },
+                { label: "➡️ Right", action: moveRight },
+                { label: "⏬ Hard drop", action: () => hardDrop(currentTetro) },
+                { label: "🔀 Hold", action: holdTetro },
+                { label: "⬇️ Soft drop", action: dropButton },
+                { label: "🔄 Rotate", action: rotate }
+            ];
+
+            // Calculate button sizes dynamically based on canvas size
+            function calculateButtonSizes() {
+                buttonWidth = (cw - 4 * buttonMargin) / 3; // Divide canvas width into 3 parts (left, right, down)
+                buttonHeight = subbar / 2 - 5 / 3 * buttonMargin; // 10% of canvas height for button height
+            }
+
+            function handleButtonPress(button) {
+                if (button.isPressed) return;
+                button.isPressed = true; // Set button to pressed state
+                button.action(); // Execute action
+                button.intervalId = setTimeout(() => {
+                    button.intervalId = setInterval(() => {
+                        button.action();
+                    }, 100); // Repeat action every 100 milliseconds
+                }, 300); // Delay for first hold action (500 milliseconds)
+            }
+
+            function handleButtonRelease(button) {
+                clearInterval(button.intervalId); // Stop repeating action
+                button.isPressed = false; // Reset button state
+            }
+
+            // Draw buttons
+            function drawButtons() {
+                // Calculate button sizes dynamically
+                calculateButtonSizes();
+
+                // Draw each button and label
+                ctx.fillStyle = buttonColor;
+                const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Arial`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                buttons.forEach((button, index) => {
+                    const x = buttonMargin + index % 3 * (buttonWidth + buttonMargin);
+                    const y = ch - subbar + Math.floor(index / 3) * (buttonHeight + buttonMargin);
+
+                    // Draw button image
+                    const image = button.isPressed ? buttonPressedImage : buttonImage;
+                    ctx.drawImage(image, x, y, buttonWidth, buttonHeight);
+                    // Draw button label
+                    ctx.fillStyle = "black";
+                    ctx.fillText(button.label, x + buttonWidth / 2, y + buttonHeight / 2);
+                    ctx.fillStyle = buttonColor;  // Reset fill color for next button
+                });
+            }
+
+            // Function to check if a point is inside a button
+            function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
+                return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
+            }
+
+            // Add event listeners for button press and release
+            canvas.addEventListener("mousedown", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if clicked inside any button
+                buttons.forEach(button => {
+                    const x = buttonMargin + buttons.indexOf(button) % 3 * (buttonWidth + buttonMargin);
+                    const y = ch - subbar + Math.floor(buttons.indexOf(button) / 3) * (buttonHeight + buttonMargin);
+
+                    if (isInsideButton(mouseX, mouseY, x, y, buttonWidth, buttonHeight)) {
+                        handleButtonPress(button);
+                    }
+                });
+            });
+
+            canvas.addEventListener("mouseup", function (event) {
+                buttons.forEach(button => {
+                    if (button.isPressed) {
+                        handleButtonRelease(button);
+                    }
+                });
+            });
+
+            canvas.addEventListener("mouseleave", function (event) {
+                buttons.forEach(button => {
+                    if (button.isPressed) {
+                        handleButtonRelease(button);
+                    }
+                });
+            });
+
+            
+
+
+            // Function to check if a point is inside a button
+            function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
+                return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
+            }
+
+            // Add event listener for button click
+            canvas.addEventListener("mousedown", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if clicked inside any button
+                buttons.forEach(button => {
+                    const x = buttonMargin + buttons.indexOf(button) % 3 * (buttonWidth + buttonMargin);
+                    const y = ch - subbar + Math.floor(buttons.indexOf(button) / 3) * (buttonHeight + buttonMargin);
+
+                    if (isInsideButton(mouseX, mouseY, x, y, buttonWidth, buttonHeight)) {
+                        handleButtonClick(button);
+                    }
+                });
+            });
+
             function drawStartButton() {
                 calculateButtonSizes()
                 ctx.fillStyle = buttonColor;
@@ -739,85 +863,8 @@
                 }
             });
 
-
-            // Calculate button sizes dynamically based on canvas size
-            function calculateButtonSizes() {
-                buttonWidth = (cw - 4 * buttonMargin) / 3; // Divide canvas width into 3 parts (left, right, down)
-                buttonHeight = subbar / 2 - 5 / 3 * buttonMargin; // 10% of canvas height for button height
-            }
-
-            // Draw buttons dynamically based on canvas size
-            function drawButtons() {
-                // Calculate button sizes dynamically
-                calculateButtonSizes();
-
-                // Button properties
-                const buttons = [
-                    { label: "⬅️ Left", x: buttonMargin, y: ch - buttonHeight - buttonMargin },
-                    { label: "➡️ Right", x: 2 * buttonMargin + buttonWidth, y: ch - buttonHeight - buttonMargin },
-                    { label: "⏬ Hard drop", x: 3 * buttonMargin + 2 * buttonWidth, y: ch - buttonHeight - buttonMargin },
-                    { label: "🔀 Hold", x: buttonMargin, y: ch - 2 * buttonHeight - 2 * buttonMargin },
-                    { label: "⬇️ Soft drop", x: 2 * buttonMargin + buttonWidth, y: ch - 2 * buttonHeight - 2 * buttonMargin },
-                    { label: "🔄 Rotate", x: 3 * buttonMargin + 2 * buttonWidth, y: ch - 2 * buttonHeight - 2 * buttonMargin },
-                    //{ label: "⏸ Pause", x: 3 * buttonMargin + 2 * buttonWidth, y: ch - 3 * buttonHeight - 3 * buttonMargin }
-
-                ];
-
-                // Draw each button and label
-                ctx.fillStyle = buttonColor;
-                const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
-                ctx.font = `${fontSize}px Arial`;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-
-                buttons.forEach(button => {
-                    // Draw button image
-                    ctx.drawImage(buttonImage, button.x, button.y, buttonWidth, buttonHeight);
-                    // Draw button label
-                    ctx.fillStyle = "black";
-                    ctx.fillText(button.label, button.x + buttonWidth / 2, button.y + buttonHeight / 2);
-                    ctx.fillStyle = buttonColor;  // Reset fill color for next button
-                });
-            }
-
-            // Event listener for mouse clicks
-            canvas.addEventListener("click", function (event) {
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
-
-                // Check if clicked inside any button
-                if (isInsideButton(mouseX, mouseY, buttonMargin, ch - buttonHeight - buttonMargin, buttonWidth, buttonHeight)) {
-                    moveLeft();
-                } else if (isInsideButton(mouseX, mouseY, 2 * buttonMargin + buttonWidth, ch - buttonHeight - buttonMargin, buttonWidth, buttonHeight)) {
-                    moveRight();
-                } else if (isInsideButton(mouseX, mouseY, 3 * buttonMargin + 2 * buttonWidth, ch - buttonHeight - buttonMargin, buttonWidth, buttonHeight)) {
-                    hardDrop(currentTetro);
-                } else if (isInsideButton(mouseX, mouseY, buttonMargin, ch - 2 * buttonHeight - 2 * buttonMargin, buttonWidth, buttonHeight)) {
-                    /*
-                    if (paused) {
-                        gameInterval = setInterval(drop,speed)
-                    } else {
-                        clearInterval(gameInterval);
-                    }*/
-                    holdTetro();
-                } else if (isInsideButton(mouseX, mouseY, 2 * buttonMargin + buttonWidth, ch - 2 * buttonHeight - 2 * buttonMargin, buttonWidth, buttonHeight)) {
-                    dropButton();
-                } else if (isInsideButton(mouseX, mouseY, 3 * buttonMargin + 2 * buttonWidth, ch - 2 * buttonHeight - 2 * buttonMargin, buttonWidth, buttonHeight)) {
-                    rotate();
-                }
-            });
-
-            let paused = false;
-            // Initial drawing of buttons
-            drawButtons();
             drawStartButton();
-
-            // Function to check if a point is inside a button
-            function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
-                return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
-            }
-
+            
             function rotatePoints() {
 
 
