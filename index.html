@@ -779,6 +779,40 @@
                 return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
             }
 
+            // Add event listeners for touch events
+canvas.addEventListener("touchstart", function (event) {
+    event.preventDefault(); // Prevent default touch behavior (like scrolling or zooming)
+    const rect = canvas.getBoundingClientRect();
+    const touch = event.touches[0]; // Get the first touch
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+
+    // Check if touched inside any button
+    buttons.forEach(button => {
+        const x = buttonMargin + buttons.indexOf(button) % 3 * (buttonWidth + buttonMargin);
+        const y = ch - subbar + Math.floor(buttons.indexOf(button) / 3) * (buttonHeight + buttonMargin);
+
+        if (isInsideButton(touchX, touchY, x, y, buttonWidth, buttonHeight)) {
+            handleButtonPress(button);
+        }
+    });
+});
+
+canvas.addEventListener("touchend", function (event) {
+    event.preventDefault(); // Prevent default touch behavior
+    buttons.forEach(button => {
+        if (button.isPressed) {
+            handleButtonRelease(button);
+        }
+    });
+});
+
+canvas.addEventListener("touchmove", function (event) {
+    event.preventDefault(); // Prevent default touch behavior
+    // You can add code here to handle touch movements if necessary
+});
+
+
             // Add event listeners for button press and release
             canvas.addEventListener("mousedown", function (event) {
                 const rect = canvas.getBoundingClientRect();
@@ -815,11 +849,6 @@
             
 
 
-            // Function to check if a point is inside a button
-            function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
-                return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
-            }
-
             // Add event listener for button click
             canvas.addEventListener("mousedown", function (event) {
                 const rect = canvas.getBoundingClientRect();
@@ -837,6 +866,32 @@
                 });
             });
 
+                   // Event listener for start button
+            canvas.addEventListener("click", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if clicked inside start button
+                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
+                    // Start or restart the game
+                    startGame();
+                }
+            });
+
+                   // Event listener for start button
+            canvas.addEventListener("touchend", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if clicked inside start button
+                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
+                    // Start or restart the game
+                    startGame();
+                }
+            });
+
             function drawStartButton() {
                 calculateButtonSizes()
                 ctx.fillStyle = buttonColor;
@@ -850,18 +905,14 @@
                 ctx.fillText("Start", cw / 2, ch / 2);
             }
 
-            // Event listener for start button
-            canvas.addEventListener("click", function (event) {
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
+            
 
-                // Check if clicked inside start button
-                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
-                    // Start or restart the game
-                    startGame();
-                }
-            });
+            // Function to check if a point is inside a button
+            function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
+                return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
+            }
+
+     
 
             drawStartButton();
             
