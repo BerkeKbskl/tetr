@@ -26,7 +26,7 @@
 
 <body>
 
-    <canvas height="1334px" width="750px" id="myCanvas"></canvas>
+    <canvas height="1600px" width="900px" id="myCanvas"></canvas>
 
 
     <script>
@@ -189,7 +189,7 @@
                 drawInterval = setInterval(draw, 16);
                 gameInterval = setInterval(drop, speed);
 
-               
+
             }
 
             let soft = 1;
@@ -241,9 +241,9 @@
             }
 
             function moveRight() {
-                const moveS = new Audio('move.mp3');
-                moveS.play();
                 if (checkCollision(currentTetro, 1, 0) === false) {
+                    const moveS = new Audio('move.mp3');
+                    moveS.play();
                     currentTetro.tl[0] += 1;
                 }
                 resetSoftLock();
@@ -259,14 +259,14 @@
             }
 
             function dropButton() {
-                const moveS = new Audio('move.mp3');
-                moveS.play();
-                score += 1;
                 if (isSoftLocked) {
                     resetSoftLock();
                     hardDrop(currentTetro);
                 } else {
                     drop();
+                    const moveS = new Audio('move.mp3');
+                    moveS.play();
+                    score += 1;
                 }
             }
 
@@ -332,6 +332,11 @@
             function holdTetro() {
                 const holdS = new Audio('hold.mp3');
                 holdS.play();
+
+                if (isSoftLocked) {
+                    resetSoftLock();
+                }
+
                 const temp = currentTetro;
                 if (hold) {
                     currentTetro = hold;
@@ -548,17 +553,18 @@
                 // Update combo score
                 if (combo > 0) {
                     score += (combo - 1) * 50 * level;
+                    messageCh("Combo!", (combo - 1) * 50 * level);
                 }
 
-                lines += clearedLineCount;
-                lastLineCleared = clearedLineCount;
-
                 // Update level
-                if (Math.floor((clearedLineCount + lines) / 10) != level - 1) {
+                if (Math.floor((clearedLineCount + lines) / 10) != (level - 1)) {
                     level++;
                     speed = speedTable[level - 1];
                     messageCh("Level Up! " + level, "");
                 }
+
+                lines += clearedLineCount;
+                lastLineCleared = clearedLineCount;
 
                 setTimeout(function () { gameInterval = setInterval(drop, speed) }, clearLineTime);
                 // Remove any messages after a delay
@@ -630,7 +636,7 @@
 
             function drawScore() {
                 ctx.textAlign = "left";
-                const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
+                const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Arial`;
                 ctx.fillStyle = "black";
 
@@ -676,11 +682,11 @@
 
                 // Draw next tetromino
                 ctx.fillStyle = "black";
-                ctx.fillText("Next: ", cw * 0.77, ch * 0.05);
-                drawNext(nextTetro, cw * 0.77, ch * 0.07);
+                ctx.fillText("Next: ", cw * 0.8, ch * 0.05);
+                drawNext(nextTetro, cw * 0.8, ch * 0.07);
                 ctx.fillStyle = "black";
-                ctx.fillText("Hold: ", cw * 0.77, ch * 0.25);
-                drawNext(hold, cw * 0.77, ch * 0.27);
+                ctx.fillText("Hold: ", cw * 0.8, ch * 0.25);
+                drawNext(hold, cw * 0.8, ch * 0.27);
                 drawTetromino(currentTetro);
 
 
@@ -707,6 +713,27 @@
                     array[j] = temp;
                 }
             }
+            let paused = false;
+            function pauseGame() {
+                if (paused) {
+                    paused = false;
+                    clearInterval(gameInterval)
+                    gameInterval = setInterval(drop,speed)
+                } else {
+                    paused = true;
+                    clearInterval(gameInterval)
+                }
+            }
+
+            function muteGame() {
+                if (audioElement.muted) {
+                    audioElement.muted = false;
+                    //muteButton.textContent = 'Mute';
+                } else {
+                    audioElement.muted = true;
+                    //muteButton.textContent = 'Unmute';
+                }
+            }
 
 
 
@@ -718,12 +745,15 @@
 
             // Array to hold button objects
             const buttons = [
+              
+                { label: "🔀 Hold", action: holdTetro },
+                { label: "⬇️ Soft drop", action: dropButton },
+                { label: "🔄 Rotate", action: rotate },
                 { label: "⬅️ Left", action: moveLeft },
                 { label: "➡️ Right", action: moveRight },
                 { label: "⏬ Hard drop", action: () => hardDrop(currentTetro) },
-                { label: "🔀 Hold", action: holdTetro },
-                { label: "⬇️ Soft drop", action: dropButton },
-                { label: "🔄 Rotate", action: rotate }
+                { label: "⏸️ Pause", action: pauseGame },
+                { label: "🔇 Mute", action: muteGame }
             ];
 
             // Calculate button sizes dynamically based on canvas size
@@ -780,37 +810,37 @@
             }
 
             // Add event listeners for touch events
-canvas.addEventListener("touchstart", function (event) {
-    event.preventDefault(); // Prevent default touch behavior (like scrolling or zooming)
-    const rect = canvas.getBoundingClientRect();
-    const touch = event.touches[0]; // Get the first touch
-    const touchX = touch.clientX - rect.left;
-    const touchY = touch.clientY - rect.top;
+            canvas.addEventListener("touchstart", function (event) {
+                event.preventDefault(); // Prevent default touch behavior (like scrolling or zooming)
+                const rect = canvas.getBoundingClientRect();
+                const touch = event.touches[0]; // Get the first touch
+                const touchX = touch.clientX - rect.left;
+                const touchY = touch.clientY - rect.top;
 
-    // Check if touched inside any button
-    buttons.forEach(button => {
-        const x = buttonMargin + buttons.indexOf(button) % 3 * (buttonWidth + buttonMargin);
-        const y = ch - subbar + Math.floor(buttons.indexOf(button) / 3) * (buttonHeight + buttonMargin);
+                // Check if touched inside any button
+                buttons.forEach(button => {
+                    const x = buttonMargin + buttons.indexOf(button) % 3 * (buttonWidth + buttonMargin);
+                    const y = ch - subbar + Math.floor(buttons.indexOf(button) / 3) * (buttonHeight + buttonMargin);
 
-        if (isInsideButton(touchX, touchY, x, y, buttonWidth, buttonHeight)) {
-            handleButtonPress(button);
-        }
-    });
-});
+                    if (isInsideButton(touchX, touchY, x, y, buttonWidth, buttonHeight)) {
+                        handleButtonPress(button);
+                    }
+                });
+            });
 
-canvas.addEventListener("touchend", function (event) {
-    event.preventDefault(); // Prevent default touch behavior
-    buttons.forEach(button => {
-        if (button.isPressed) {
-            handleButtonRelease(button);
-        }
-    });
-});
+            canvas.addEventListener("touchend", function (event) {
+                event.preventDefault(); // Prevent default touch behavior
+                buttons.forEach(button => {
+                    if (button.isPressed) {
+                        handleButtonRelease(button);
+                    }
+                });
+            });
 
-canvas.addEventListener("touchmove", function (event) {
-    event.preventDefault(); // Prevent default touch behavior
-    // You can add code here to handle touch movements if necessary
-});
+            canvas.addEventListener("touchmove", function (event) {
+                event.preventDefault(); // Prevent default touch behavior
+                // You can add code here to handle touch movements if necessary
+            });
 
 
             // Add event listeners for button press and release
@@ -846,7 +876,7 @@ canvas.addEventListener("touchmove", function (event) {
                 });
             });
 
-            
+
 
 
             // Add event listener for button click
@@ -866,7 +896,7 @@ canvas.addEventListener("touchmove", function (event) {
                 });
             });
 
-                   // Event listener for start button
+            // Event listener for start button
             canvas.addEventListener("click", function (event) {
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = event.clientX - rect.left;
@@ -878,9 +908,10 @@ canvas.addEventListener("touchmove", function (event) {
                     startGame();
                 }
             });
+            
 
-                   // Event listener for start button
-            canvas.addEventListener("touchend", function (event) {
+            // Event listener for start button
+            canvas.addEventListener("touchstart", function (event) {
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = event.clientX - rect.left;
                 const mouseY = event.clientY - rect.top;
@@ -905,17 +936,15 @@ canvas.addEventListener("touchmove", function (event) {
                 ctx.fillText("Start", cw / 2, ch / 2);
             }
 
-            
+
 
             // Function to check if a point is inside a button
             function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
                 return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
             }
 
-     
-
             drawStartButton();
-            
+
             function rotatePoints() {
 
 
