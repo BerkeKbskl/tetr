@@ -89,19 +89,20 @@
             let dash = 0;
             let dashPos = [];
 
+            let startingPositions = [0, 0]
 
+            let musicOn = true;
 
             const buttonImage = new Image();
-            buttonImage.src = 'button.png';
-
             const buttonPressedImage = new Image();
+            buttonImage.src = 'button.png';
             buttonPressedImage.src = 'button2.png';
 
 
 
             // with default positions
             const tetrominos = [
-                { name: "i", tl: [0, 0], positions: [[1, 0], [1, 1], [1, 2], [1, 3]], color: "cyan" },
+                { name: "i", tl: [0, 0], positions: [[0, 0], [1, 0], [2, 0], [3, 0]], color: "cyan" },
                 { name: "j", tl: [0, 0], positions: [[0, 0], [1, 0], [1, 1], [1, 2]], color: "orange" },
                 { name: "l", tl: [0, 0], positions: [[0, 2], [1, 0], [1, 1], [1, 2]], color: "blue" },
                 { name: "o", tl: [0, 0], positions: [[0, 0], [0, 1], [1, 0], [1, 1]], color: "yellow" },
@@ -147,7 +148,8 @@
 
             function drawTetromino(tetromino) {
                 for (let i = 0; i < tetromino.positions.length; i++) {
-                    const [x, y] = tetromino.positions[i];
+                    const x = tetromino.positions[i][0] + startingPositions[0];
+                    const y = tetromino.positions[i][1] + startingPositions[1];
                     drawSquare((x + tetromino.tl[0]) * bs, (y + tetromino.tl[1]) * bs, tetromino.color, soft);
                 }
 
@@ -174,6 +176,8 @@
             let drawInterval;
 
             function startGame() {
+                const startm = new Audio('start.mp3');
+                musicOn ? startm.play() : null;
 
                 document.addEventListener('keydown', keyDownHandler, false);
                 gameArray = Array.from({ length: hTile }, () => Array(wTile).fill(null));
@@ -185,17 +189,16 @@
                 shuffleArray(bag);
                 popQueue();
                 hold = bag.pop();
-                speed = 1200;
+                speed = speedTable[0];
                 drawInterval = setInterval(draw, 16);
                 gameInterval = setInterval(drop, speed);
-
 
             }
 
             let soft = 1;
-            let softAnimation; // softness animation call
+            let softAnimation; // ssoftness animation call
             let isSoftLocked = false; // Flag to track soft lock status
-            let lockDelay = 560;
+            let lockDelay = 500;
             let beginningToLock;
 
             function lock() {
@@ -212,7 +215,6 @@
                 clearLine();
                 clearInterval(softAnimation);
                 soft = 1;
-                //gameInterval = setInterval(drop, speed);
             }
 
             function drop() {
@@ -243,16 +245,16 @@
             function moveRight() {
                 if (checkCollision(currentTetro, 1, 0) === false) {
                     const moveS = new Audio('move.mp3');
-                    moveS.play();
+                    musicOn ? moveS.play() : null;
                     currentTetro.tl[0] += 1;
                 }
                 resetSoftLock();
             }
 
             function moveLeft() {
-                const moveS = new Audio('move.mp3');
-                moveS.play();
                 if (checkCollision(currentTetro, -1, 0) === false) {
+                    const moveS = new Audio('move.mp3');
+                    musicOn ? moveS.play() : null;
                     currentTetro.tl[0] -= 1;
                 }
                 resetSoftLock();
@@ -265,7 +267,7 @@
                 } else {
                     drop();
                     const moveS = new Audio('move.mp3');
-                    moveS.play();
+                    musicOn ? moveS.play() : null;
                     score += 1;
                 }
             }
@@ -285,12 +287,11 @@
 
                 if (isSoftLocked) {
                     resetSoftLock();
-                    hardDrop(tetro);
                 }
 
                 let cells = 0;
                 const harddropS = new Audio('harddrop.mp3');
-                harddropS.play();
+                musicOn ? harddropS.play() : null;
                 while (checkCollision(tetro, 0, 1) === false) {
                     tetro.tl[1] += 1;
                     cells++;
@@ -307,19 +308,8 @@
                 }, 16);
 
                 // Put the tetromino
-                for (let i = 0; i < tetro.positions.length; i++) {
-                    const [x, y] = tetro.positions[i];
-                    dashPos.push([tetro.tl[0] + x, y + tetro.tl[1] - 1]);
-                    gameArray[y + tetro.tl[1]][x + tetro.tl[0]] = {
-                        name: "standalone",
-                        color: tetro.color
-                    }
-                }
-
-                score += cells;
-
-                popQueue();
-                clearLine();
+                lock();
+                score += 2 * cells;
             }
 
 
@@ -331,7 +321,7 @@
 
             function holdTetro() {
                 const holdS = new Audio('hold.mp3');
-                holdS.play();
+                musicOn ? holdS.play() : null;
 
                 if (isSoftLocked) {
                     resetSoftLock();
@@ -345,7 +335,6 @@
                     hold = temp;
                     popQueue();
                 }
-                hold.tl = [4, 0];
                 currentTetro.tl = [4, 0];
             }
 
@@ -394,8 +383,8 @@
 
             function rotate() {
                 const rotateS = new Audio('rotate.mp3');
-                rotateS.play();
-                // If the current tetromino is an "O" block, it doesn't need rotation
+                musicOn ? rotateS.play() : null;
+
                 if (currentTetro.name == "o") {
                     return;
                 }
@@ -473,8 +462,6 @@
                 requestAnimationFrame(drawFlash);
             }
 
-
-
             function clearLine() {
 
                 let clearedLineCount = 0;
@@ -498,17 +485,19 @@
                 if (linesToClear.length > 0) {
 
                     clearInterval(gameInterval);
+                    gameInterval = null;
+
                     if (linesToClear.length > 3) {
                         flashCanvas();
                         const tetrisclear = new Audio('tetrisclear.mp3');
-                        tetrisclear.play();
+                        musicOn ? tetrisclear.play() : null;
                     } else {
                         const clearS = new Audio('clear.mp3');
-                        clearS.play()
+                        musicOn ? clearS.play() : null;
                     }
 
                     // Clear lines block by block with a delay
-                    let delay = clearLineTime / wTile; // Adjust delay for block by block clearing
+                    let delay = clearLineTime / (wTile + 1); // Adjust delay for block by block clearing
                     linesToClear.forEach((lineIndex, index) => {
                         for (let j = 0; j < wTile; j++) {
                             setTimeout(() => {
@@ -526,11 +515,13 @@
                                 // Clear the top row
                                 gameArray[0][j] = null;
                             }
-                        }, wTile * delay);
+                        }, wTile * delay + 0.01);
                     });
 
                     // clash
                     updateGameParameters(clearedLineCount);
+                } else {
+                    lastLineCleared = 0;
                 }
             }
 
@@ -550,11 +541,6 @@
                     messageCh("TETRIS!", 800);
                 }
 
-                // Update combo score
-                if (combo > 0) {
-                    score += (combo - 1) * 50 * level;
-                    messageCh("Combo!", (combo - 1) * 50 * level);
-                }
 
                 // Update level
                 if (Math.floor((clearedLineCount + lines) / 10) != (level - 1)) {
@@ -564,15 +550,28 @@
                 }
 
                 lines += clearedLineCount;
+
+                if (lastLineCleared != 0) {
+                    combo++;
+                } else {
+                    combo = 0;
+                }
+
                 lastLineCleared = clearedLineCount;
 
-                setTimeout(function () { gameInterval = setInterval(drop, speed) }, clearLineTime);
+                // Update combo score
+                if (combo > 0) {
+                    score += (combo + 1) * 50 * level;
+                    messageCh((combo + 1) + "x Combo!", (combo - 1) * 50 * level);
+                }
+
+                setTimeout(function () { clearInterval(gameInterval); gameInterval = setInterval(drop, speed) }, clearLineTime + 0.01);
                 // Remove any messages after a delay
                 setTimeout(messageRemove, messageDelay);
             }
 
             const speedTable = {
-                0: 799,
+                0: 860, //799,
                 1: 715,
                 2: 632,
                 3: 549,
@@ -623,7 +622,7 @@
             function endGame() {
                 document.removeEventListener('keydown', keyDownHandler, false);
                 const failS = new Audio('fail.mp3');
-                failS.play();
+                musicOn ? failS.play() : null;
                 ctx.clearRect(0, 0, cw, ch);
                 ctx.fillStyle = "black";
                 ctx.textAlign = "center";
@@ -636,8 +635,8 @@
 
             function drawScore() {
                 ctx.textAlign = "left";
-                const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
-                ctx.font = `${fontSize}px Arial`;
+                const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Roboto`;
                 ctx.fillStyle = "black";
 
                 const xPos = cw * 0.75; // Position the score text dynamically
@@ -682,11 +681,14 @@
 
                 // Draw next tetromino
                 ctx.fillStyle = "black";
-                ctx.fillText("Next: ", cw * 0.8, ch * 0.05);
-                drawNext(nextTetro, cw * 0.8, ch * 0.07);
+                ctx.textAlign = "left";
+                const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Roboto`;
+                ctx.fillText("Next: ", cw * 0.75, ch * 0.05);
+                drawNext(nextTetro, cw * 0.75, ch * 0.07);
                 ctx.fillStyle = "black";
-                ctx.fillText("Hold: ", cw * 0.8, ch * 0.25);
-                drawNext(hold, cw * 0.8, ch * 0.27);
+                ctx.fillText("Hold: ", cw * 0.75, ch * 0.25);
+                drawNext(hold, cw * 0.75, ch * 0.27);
                 drawTetromino(currentTetro);
 
 
@@ -713,26 +715,31 @@
                     array[j] = temp;
                 }
             }
+
             let paused = false;
             function pauseGame() {
                 if (paused) {
                     paused = false;
-                    clearInterval(gameInterval)
-                    gameInterval = setInterval(drop,speed)
+                    const startm = new Audio('start.mp3');
+                    musicOn ? startm.play() : null;
+                    gameInterval = setInterval(drop, speed)
+                    drawInterval = setInterval(draw, 16)
                 } else {
                     paused = true;
-                    clearInterval(gameInterval)
+                    //document.removeEventListener('keydown', keyDownHandler, false);
+                    const pause = new Audio('pause.mp3');
+                    musicOn ? pause.play() : null;
+                    ctx.clearRect(0, 0, cw, ch);
+                    ctx.fillStyle = "black";
+                    ctx.textAlign = "center";
+                    ctx.fillText("Paused...", cw / 2, (ch - subbar) / 2 - 30);
+                    clearInterval(gameInterval);
+                    clearInterval(drawInterval)
                 }
             }
 
             function muteGame() {
-                if (audioElement.muted) {
-                    audioElement.muted = false;
-                    //muteButton.textContent = 'Mute';
-                } else {
-                    audioElement.muted = true;
-                    //muteButton.textContent = 'Unmute';
-                }
+                musicOn = !musicOn;
             }
 
 
@@ -745,7 +752,7 @@
 
             // Array to hold button objects
             const buttons = [
-              
+
                 { label: "🔀 Hold", action: holdTetro },
                 { label: "⬇️ Soft drop", action: dropButton },
                 { label: "🔄 Rotate", action: rotate },
@@ -786,7 +793,7 @@
                 // Draw each button and label
                 ctx.fillStyle = buttonColor;
                 const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
-                ctx.font = `${fontSize}px Arial`;
+                ctx.font = `${fontSize}px Roboto`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -908,7 +915,7 @@
                     startGame();
                 }
             });
-            
+
 
             // Event listener for start button
             canvas.addEventListener("touchstart", function (event) {
@@ -979,12 +986,19 @@
                     rotate();
                 }
                 else if (e.key === " " || e.key === "Spacebar") {
+                    if (gameInterval == null) {
+                        startGame();
+                    }
                     hardDrop(currentTetro) // hard drop
                 } else if (e.key === "x") {
                     holdTetro();
                 } else if (e.key === "a") {
+                    clearInterval(gameInterval)
+                    clearInterval(drawInterval);
+                    resetSoftLock();
                     startGame();
-
+                } else if (e.key === "p") {
+                    pauseGame();
                 }
             }
 
