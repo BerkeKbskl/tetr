@@ -6,19 +6,46 @@
     <title>Tetris</title>
     <style>
         body {
-            touch-action: none;
-            margin: 0px;
+            margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             background-color: black;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 0px;
+            padding: 0px;
         }
 
         canvas {
-            background-color: #a9a9a9;
-            background-image: url("background.png");
-            background-size: contain;
+            background-color: black;
+            background-image: url("scanlines2.png");
+            background-repeat: no-repeat;
+
+            z-index: 1;
+        }
+
+        .canvas-container::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("https://s3-us-west-2.amazonaws.com/s.cdpn.io/86186/crt.png");
+            background-repeat: no-repeat;
+            background-size: 100% 100%;
+            /* Adjust the transparency as needed */
+            z-index: 22;
+            pointer-events: none;
+            /* Ensures it doesn't interfere with canvas interactions */
         }
     </style>
 
@@ -26,21 +53,25 @@
 
 <body>
 
-    <canvas height="1600px" width="900px" id="myCanvas"></canvas>
+    <div class="canvas-container">
+        <canvas id="myCanvas" width="900" height="1600"></canvas>
+    </div>
 
-
+    <script src="glfx.js"></script>
     <script>
 
         document.addEventListener("DOMContentLoaded", function () {
+
+
             const canvas = document.getElementById("myCanvas");
             const ctx = canvas.getContext("2d");
+
 
             let gameInterval;
 
             let score = 0;
-            let level = 1;
             let lines = 0;
-
+            let level = 1;
             const wTile = 10;
             const hTile = 20;
 
@@ -71,25 +102,26 @@
             let cw = canvas.width;
 
             const subbar = ch * 0.20;
-
-            const bs = (ch - subbar) / hTile; // size
+            let startingPositions = [15, 20]
+            const bs = (ch - startingPositions[0] * 2 - subbar) / hTile; // size
 
             let speed;
 
             let lastLineCleared = 0;
             let combo = 0;
 
+
             // tetrominos
             let currentTetro;
             let nextTetro;
-            let hold;
+            let heldTetro;
             let gameArray = Array.from({ length: hTile }, () => Array(wTile).fill(null));
             let bag = [];
 
             let dash = 0;
             let dashPos = [];
 
-            let startingPositions = [0, 0]
+
 
             let musicOn = true;
 
@@ -99,100 +131,101 @@
             buttonPressedImage.src = 'button2.png';
 
 
+            var crtLines = new Image();
+            crtLines.src = "scanlines.png";
+
+            // Make sure you've included the glfx.js script in your code!
+
+            // Here I load a PNG with scanlines that I overwrite onto the 2D game's canvas.
+            // This file happens to be customized for the demo game, so to make this a
+            // general solution we'll need a generic scanline image or we'll generate them
+            // procedurally.
+            // Start loading the image right away, not after the onload event.
+
+            window.addEventListener('load', drawStartButton, false);
+
+            function fakeCRT() {
+                var glcanvas, source, srcctx, texture, w, h, hw, hh, w75;
+
+                // Try to create a WebGL canvas (will fail if WebGL isn't supported)
+                try {
+                    glcanvas = fx.canvas();
+                } catch (e) { return; }
+
+                // Assumes the first canvas tag in the document is the 2D game, but
+                // obviously we could supply a specific canvas element here.
+                source = document.getElementById("myCanvas");
+                srcctx = source.getContext("2d");
+
+                // This tells glfx what to use as a source image
+                texture = glcanvas.texture(source);
+
+                // Just setting up some details to tweak the bulgePinch effect
+                w = source.width;
+                h = source.height;
+                hw = w / 2;
+                hh = h / 2;
+                w75 = h * 1;
+
+                // Hide the source 2D canvas and put the WebGL Canvas in its place
+                source.parentNode.insertBefore(glcanvas, source);
+                source.style.display = 'none';
+                glcanvas.className = source.className;
+                glcanvas.id = source.id;
+                source.id = 'old_' + source.id;
+
+                // It is pretty silly to setup a separate animation timer loop here, but
+                // this lets us avoid monkeying with the source game's code.
+                // It would make way more sense to do the following directly in the source
+                // game's draw function in terms of performance.
+                setInterval(function () {
+                    // Give the source scanlines
+                    srcctx.drawImage(crtLines, 0, 0, w, h);
+
+                    // Load the latest source frame
+                    texture.loadContentsOf(source);
+
+                    // Apply WebGL magic
+                    glcanvas.draw(texture)
+                        .bulgePinch(hw, hh, w75, 0.05)
+                        .vignette(0.25, 0.44)
+                        .noise(0.02)
+                        .vibrance(0.1)
+                        .update();
+                }, Math.floor(1000 / 40));
+            }
+
+
 
             // with default positions
             const tetrominos = [
-                { name: "i", tl: [0, 0], positions: [[0, 0], [1, 0], [2, 0], [3, 0]], color: "cyan" },
-                { name: "j", tl: [0, 0], positions: [[0, 0], [1, 0], [1, 1], [1, 2]], color: "orange" },
-                { name: "l", tl: [0, 0], positions: [[0, 2], [1, 0], [1, 1], [1, 2]], color: "blue" },
-                { name: "o", tl: [0, 0], positions: [[0, 0], [0, 1], [1, 0], [1, 1]], color: "yellow" },
-                { name: "s", tl: [0, 0], positions: [[1, 0], [1, 1], [0, 1], [0, 2]], color: "red" },
-                { name: "t", tl: [0, 0], positions: [[1, 0], [0, 1], [1, 1], [2, 1]], color: "purple" },
-                { name: "z", tl: [0, 0], positions: [[0, 0], [0, 1], [1, 1], [1, 2]], color: "green" }
+                { name: "i", tl: [0, 0], positions: [[0, 1], [1, 1], [2, 1], [3, 1]], color: "cyan", orientation: 0 },
+                { name: "l", tl: [0, 0], positions: [[2, 0], [0, 1], [1, 1], [2, 1]], color: "orange", orientation: 0 },
+                { name: "j", tl: [0, 0], positions: [[0, 0], [0, 1], [1, 1], [2, 1]], color: "blue", orientation: 0 },
+                { name: "o", tl: [0, 0], positions: [[1, 0], [2, 0], [1, 1], [2, 1]], color: "yellow", orientation: 0 },
+                { name: "z", tl: [0, 0], positions: [[0, 0], [1, 0], [1, 1], [2, 1]], color: "red", orientation: 0 },
+                { name: "t", tl: [0, 0], positions: [[1, 0], [0, 1], [1, 1], [2, 1]], color: "purple", orientation: 0 },
+                { name: "s", tl: [0, 0], positions: [[2, 0], [0, 1], [1, 1], [1, 0]], color: "green", orientation: 0 }
             ];
 
-
-            function drawSquare(x, y, color, transparency = 1) {
-                const imgX = x;
-                const imgY = y;
-
-                // Draw the block image
-                ctx.globalAlpha = transparency;
-                ctx.drawImage(blockImage, imgX, imgY, bs, bs);
-
-                // Set composite operation to 'multiply' for a better blend
-                ctx.globalCompositeOperation = 'multiply';
-                ctx.fillStyle = color;
-                ctx.globalAlpha = 0.75 * transparency; // Transparency of the tint
-                ctx.fillRect(imgX, imgY, bs, bs);
-
-                // Reset composite operation and alpha
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = 1.0;
-            }
-
-            function drawDash(x, y) {
-                // Draw the block image
-                ctx.globalAlpha = dash;
-                ctx.drawImage(dashImage, x, y, bs, bs);
-                // Reset alpha
-                ctx.globalAlpha = 1.0;
-            }
-
-            function drawBackground(x, y) {
-                // Draw the block image
-                ctx.globalAlpha = 1;
-                ctx.drawImage(back, x, y, bs, bs);
-
-            }
-
-            function drawTetromino(tetromino) {
-                for (let i = 0; i < tetromino.positions.length; i++) {
-                    const x = tetromino.positions[i][0] + startingPositions[0];
-                    const y = tetromino.positions[i][1] + startingPositions[1];
-                    drawSquare((x + tetromino.tl[0]) * bs, (y + tetromino.tl[1]) * bs, tetromino.color, soft);
-                }
-
-                // Draw ghost tetromino
-                let ghost = JSON.parse(JSON.stringify(tetromino));
-                calcGhost(ghost);
-
-                for (let i = 0; i < ghost.positions.length; i++) {
-                    drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs, (ghost.positions[i][1] + ghost.tl[1]) * bs, ghost.color, 0.2);
-                }
-            }
-
-
-
-            function drawNext(tetromino, a, b) {
-
-                for (let i = 0; i < tetromino.positions.length; i++) {
-                    const [x, y] = tetromino.positions[i];
-                    drawSquare(x * bs + a, y * bs + b, tetromino.color);
-                }
-
-            }
-
-            let drawInterval;
 
             function startGame() {
                 const startm = new Audio('start.mp3');
                 musicOn ? startm.play() : null;
-
                 document.addEventListener('keydown', keyDownHandler, false);
+
                 gameArray = Array.from({ length: hTile }, () => Array(wTile).fill(null));
                 bag = []
                 currentTetro = nextTetro = null;
                 score = lines = 0;
                 level = 1;
                 // also restart
-                shuffleArray(bag);
+                resetSoftLock();
+                clearTimeout(softAnimation)
                 popQueue();
-                hold = bag.pop();
                 speed = speedTable[0];
                 drawInterval = setInterval(draw, 16);
                 gameInterval = setInterval(drop, speed);
-
             }
 
             let soft = 1;
@@ -202,6 +235,38 @@
             let beginningToLock;
 
             function lock() {
+
+                let occupiedCorners = 0;
+                if (currentTetro.name === "t") {
+
+
+                    if (checkCollision(currentTetro, 0, 1) && checkCollision(currentTetro, 0, -1) && checkCollision(currentTetro, 1, 0) && checkCollision(currentTetro, -1, 0)) {
+                        occupiedCorners = 3;
+                    }
+
+                    console.log(checkCollision(currentTetro, 0, 1))
+                    console.log(checkCollision(currentTetro, 1, 0))
+                    console.log(checkCollision(currentTetro, 0, -1))
+                    console.log(checkCollision(currentTetro, -1, 0))
+
+                    /*
+                    corner1 = [tl[0], tl[1]];
+                    if (tl[1] >= hTile || tl[0] >= wTile || tl[1] < 0 || tl[0] < 0) { occupiedCorners++ } else
+                        if (gameArray[tl[1]][tl[0]] !== null) { occupiedCorners++ };
+ 
+                    if (tl[1] >= hTile || tl[0] + 2 >= wTile || tl[1] < 0 || tl[0] + 2 < 0) { occupiedCorners++ } else
+                        if (gameArray[tl[1]][tl[0] + 2] !== null) { occupiedCorners++ };
+ 
+                    if (tl[1] + 2 >= hTile || tl[0] >= wTile || tl[1] + 2 < 0 || tl[0] < 0) { occupiedCorners++ } else
+                        if (gameArray[tl[1] + 2][tl[0]] !== null) { occupiedCorners++ };
+ 
+                    if (tl[1] + 2 >= hTile || tl[0] + 2 >= wTile || tl[1] + 2 < 0 || tl[0] + 2 < 0) { occupiedCorners++ } else
+                        if (gameArray[tl[1] + 2][tl[0] + 2] !== null) { occupiedCorners++ };
+                    */
+
+                }
+
+
                 isSoftLocked = false; // Reset soft lock flag
                 for (let i = 0; i < currentTetro.positions.length; i++) {
                     const [x, y] = currentTetro.positions[i];
@@ -211,13 +276,36 @@
                     };
                 }
 
-                popQueue();
+                let harddropS = new Audio('harddrop.mp3');
+
+
+
+                if (!popQueue()) {
+                    return;
+                }
+
                 clearLine();
+                clearInterval(gameInterval)
+                gameInterval = setInterval(drop, speed)
                 clearInterval(softAnimation);
+
+
+                // Check if the T-spin conditions are met
+                if (occupiedCorners >= 3) {
+                    const tspin = new Audio('tspin.mp3');
+                    harddropS = new Audio('harddrop2.mp3');
+                    musicOn ? tspin.play() : null;
+                    messageCh("T-Spin", 400 * level);
+                    score += 400 * level;
+
+                }
+
+                musicOn ? harddropS.play() : null;
                 soft = 1;
             }
 
             function drop() {
+
 
                 if (checkCollision(currentTetro, 0, 1) === true) {
                     if (!isSoftLocked) {
@@ -242,28 +330,141 @@
                 }
             }
 
-            function moveRight() {
-                if (checkCollision(currentTetro, 1, 0) === false) {
+            function moveRight(margin = 1) {
+                if (checkCollision(currentTetro, margin, 0) === false) {
                     const moveS = new Audio('move.mp3');
                     musicOn ? moveS.play() : null;
-                    currentTetro.tl[0] += 1;
+                    currentTetro.tl[0] += margin;
+                    resetSoftLock();
                 }
-                resetSoftLock();
+
             }
 
-            function moveLeft() {
-                if (checkCollision(currentTetro, -1, 0) === false) {
+            function moveLeft(margin = 1) {
+                if (checkCollision(currentTetro, -margin, 0) === false) {
                     const moveS = new Audio('move.mp3');
                     musicOn ? moveS.play() : null;
-                    currentTetro.tl[0] -= 1;
+                    currentTetro.tl[0] -= margin;
+                    resetSoftLock();
                 }
-                resetSoftLock();
+
+            }
+
+
+            function clearLine() {
+                let clearedLineCount = 0;
+                let linesToClear = []; // To store the indices of lines to clear
+
+                // Check which lines need to be cleared
+                for (let i = 0; i < hTile; i++) {
+                    let allBlock = true;
+                    for (let j = 0; j < wTile; j++) {
+                        if (gameArray[i][j] === null) {
+                            allBlock = false;
+                            break;
+                        }
+                    }
+                    if (allBlock) {
+                        linesToClear.push(i);
+                        clearedLineCount++;
+                    }
+                }
+
+                if (linesToClear.length > 0) {
+                    if (linesToClear.length > 3) {
+                        flashCanvas();
+                        const tetrisclear = new Audio('tetrisclear.mp3');
+                        musicOn ? tetrisclear.play() : null;
+                    } else {
+                        const clearS = new Audio('clear.mp3');
+                        musicOn ? clearS.play() : null;
+                    }
+
+                    // Clear lines block by block immediately
+                    linesToClear.forEach(lineIndex => {
+                        for (let j = 0; j < wTile; j++) {
+                            // Clear the specified block
+                            gameArray[lineIndex][j] = null;
+                        }
+
+                        // Shift the gameArray after the blocks are cleared
+                        for (let i = lineIndex; i > 0; i--) {
+                            for (let j = 0; j < wTile; j++) {
+                                gameArray[i][j] = gameArray[i - 1][j];
+                            }
+                        }
+                        // Clear the top row
+                        for (let j = 0; j < wTile; j++) {
+                            gameArray[0][j] = null;
+                        }
+                    });
+                    updateGameParameters(clearedLineCount);
+                } else {
+                    lastLineCleared = 0;
+                }
+            }
+            function updateGameParameters(clearedLineCount) {
+                // Update score
+                if (clearedLineCount === 1) {
+                    score += 100 * level;
+                    messageCh("Single", 100);
+                } else if (clearedLineCount === 2) {
+                    score += 300 * level;
+                    messageCh("Double", 300);
+                } else if (clearedLineCount === 3) {
+                    score += 500 * level;
+                    messageCh("Triple", 500);
+                } else if (clearedLineCount === 4) {
+                    score += 800 * level;
+                    messageCh("TETRIS!", 800);
+                }
+
+                // Update level
+                if (Math.floor((clearedLineCount + lines) / 10) != (level - 1)) {
+                    level++;
+                    speed = speedTable[level - 1];
+                    messageCh("Level Up! " + level, "");
+                }
+
+                lines += clearedLineCount;
+
+                if (lastLineCleared != 0) {
+                    combo++;
+                } else {
+                    combo = 0;
+                }
+
+                lastLineCleared = clearedLineCount;
+
+                // Update combo score
+                if (combo > 0) {
+                    if (combo == 1) {
+                        const comboS = new Audio('combo1.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo == 2) {
+                        const comboS = new Audio('combo2.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo == 3) {
+                        const comboS = new Audio('combo3.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo == 4) {
+                        const comboS = new Audio('combo4.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    score += (combo + 1) * 50 * level;
+                    messageCh((combo + 1) + "x Combo!", (combo - 1) * 50 * level);
+                }
+                // Remove any messages after a delay
+
             }
 
             function dropButton() {
                 if (isSoftLocked) {
                     resetSoftLock();
-                    hardDrop(currentTetro);
+                    hardDrop();
                 } else {
                     drop();
                     const moveS = new Audio('move.mp3');
@@ -279,21 +480,21 @@
                     clearTimeout(beginningToLock);
                     soft = 1;
                     clearInterval(gameInterval);
+                    gameInterval = null;
                     gameInterval = setInterval(drop, speed);
                 }
             }
 
-            function hardDrop(tetro) {
+            function hardDrop() {
 
                 if (isSoftLocked) {
                     resetSoftLock();
                 }
 
                 let cells = 0;
-                const harddropS = new Audio('harddrop.mp3');
-                musicOn ? harddropS.play() : null;
-                while (checkCollision(tetro, 0, 1) === false) {
-                    tetro.tl[1] += 1;
+
+                while (checkCollision(currentTetro, 0, 1) === false) {
+                    currentTetro.tl[1] += 1;
                     cells++;
                 }
 
@@ -327,20 +528,23 @@
                     resetSoftLock();
                 }
 
-                const temp = currentTetro;
-                if (hold) {
-                    currentTetro = hold;
-                    hold = temp;
-                } else {
-                    hold = temp;
+                let temp = currentTetro;
+
+                if (heldTetro == null) {
                     popQueue();
+                    heldTetro = temp;
+                } else {
+                    currentTetro = heldTetro;
+                    heldTetro = temp;
                 }
-                currentTetro.tl = [4, 0];
+
+                currentTetro.tl = overlayPosition();
             }
 
-
-
             function popQueue() {
+                console.log("popqueue called")
+                resetSoftLock();
+
                 if (bag.length === 0) {
                     bag = JSON.parse(JSON.stringify(tetrominos));
                     shuffleArray(bag);
@@ -357,11 +561,43 @@
                     clearInterval(gameInterval);
                     gameInterval = null;
                     endGame();
+                    return false;
                 } else {
-                    currentTetro.tl = [4, 0]
+                    currentTetro.tl = overlayPosition()
                 }
+                return true;
 
             }
+
+            function overlayPosition() {
+                if (currentTetro.name == "i") return [3, -1]
+                return [3, 0]
+
+            }
+
+            function endGame() {
+                document.removeEventListener('keydown', keyDownHandler, false);
+                const failS = new Audio('fail.mp3');
+                musicOn ? failS.play() : null;
+                ctx.clearRect(0, 0, cw, ch);
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "cyan"
+                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.15);
+                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.10);
+                let x = document.cookie;
+                if (score > x) {
+                    document.cookie = score;
+                }
+                ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + ch * -0.05);
+                ctx.shadowBlur = 0;
+                drawStartButton();
+                clearInterval(gameInterval);
+                gameInterval = null;
+                clearInterval(drawInterval)
+            }
+
 
             function checkCollision(tetro, x, y) {
                 // x, y is the vector for the potential next move
@@ -370,65 +606,225 @@
                     let newY = tetro.positions[i][1] + tetro.tl[1] + y;
 
                     if (newY >= hTile || newX < 0 || newX >= wTile || (newY >= 0 && gameArray[newY][newX] != null)) {
-                        // Check if the collision is specifically with a wall
-                        if (newX < 0 || newX >= wTile) {
-                            return "wall";
-                        }
                         return true; // Collision with something other than a wall
                     }
                 }
                 return false;
             }
 
+            const wallKickData = {
+                "0>>1": [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+                "1>>0": [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+                "1>>2": [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+                "2>>1": [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+                "2>>3": [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+                "3>>2": [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+                "3>>0": [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+                "0>>3": [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+            };
 
-            function rotate() {
-                const rotateS = new Audio('rotate.mp3');
-                musicOn ? rotateS.play() : null;
+            const wallKickDataI = {
+                "0>>1": [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+                "1>>0": [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+                "1>>2": [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
+                "2>>1": [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+                "2>>3": [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+                "3>>2": [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+                "3>>0": [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+                "0>>3": [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]]
+            };
 
-                if (currentTetro.name == "o") {
+
+            function rotate(mode = "cw") {
+
+                if (currentTetro.name === "o") {
                     return;
                 }
-
+                const rotateS = new Audio('rotate.mp3');
+                if (musicOn) {
+                    rotateS.play();
+                }
                 // Save the current positions before rotating
                 let oldPos = JSON.parse(JSON.stringify(currentTetro.positions));
+                let oldTl = JSON.parse(JSON.stringify(currentTetro.tl));
+                let oldOrientation = currentTetro.orientation;
 
                 // Rotate the tetromino points
-                rotatePoints();
+                rotatePointsCw(mode);
 
-                // Check for collision at the new rotation
-                let collisionResult = checkCollision(currentTetro, 0, 0);
-                if (collisionResult === true) {
-                    // If there's a collision, revert to the old position
-                    currentTetro.positions = oldPos;
-                } else if (collisionResult !== false) {
-                    // Try wall kicks to adjust the position
-                    if (checkCollision(currentTetro, -1, 0) == false) { // Try moving left
-                        moveLeft();
+                let currentRotate = oldOrientation;
+                let nextRotate = currentTetro.orientation;
 
-                    } else if (checkCollision(currentTetro, 1, 0) == false) { // Try moving right
-                        moveRight();
+                let identifier = `${currentRotate}>>${nextRotate}`;
+                // Wall kicks
+                let kickApplied = false;
 
+                // redundant for 0...
+                for (let i = 0; i < 5; i++) {
+                    let kickX;
+                    let kickY;
+                    if (currentTetro.name == "i") {
+                        kickX = wallKickDataI[identifier][i][0];
+                        kickY = wallKickDataI[identifier][i][1];
                     } else {
-                        if (checkCollision(currentTetro, -2, 0) == false && checkCollision(currentTetro, -1, 0) == "wall") { // Try moving left twice
-                            moveLeft();
-                            moveLeft();
-                        } else if (checkCollision(currentTetro, 2, 0) == false && checkCollision(currentTetro, 1, 0) == "wall") { // Try moving right twice
-                            moveRight();
-                            moveRight();
-                        } else currentTetro.positions = oldPos;
-                        // If all wall kicks fail, revert to the old position
-
-                        // Additional logic for specific blocks like "I" can be added here
+                        kickX = wallKickData[identifier][i][0];
+                        kickY = wallKickData[identifier][i][1];
                     }
+                    if (checkCollision(currentTetro, kickX, kickY) === false) {
+                        currentTetro.tl[0] += kickX;
+                        currentTetro.tl[1] += kickY;
+                        kickApplied = true;
+                        break;
+                    }
+                }
+
+                if (!kickApplied) {
+                    // Revert to original position and orientation if no kicks work
+                    currentTetro.positions = oldPos;
+                    currentTetro.tl = oldTl;
+                    currentTetro.orientation = oldOrientation;
+                    // try counterclockwise
+                }
+                resetSoftLock();
+
+
+            }
+
+            function rotatePointsCw(mode) {
+                let centerX = 0;
+                let centerY = 0;
+
+                switch (currentTetro.name) {
+                    case "j":
+                    case "l":
+                    case "s":
+                    case "z":
+                    case "t":
+                        centerX = 1;
+                        centerY = 1;
+                        break;
+                    case "i":
+                        centerX = 1.5;
+                        centerY = 1.5;
+                        break;
+                    default:
+                        break;
+                }
+
+                for (let i = 0; i < currentTetro.positions.length; i++) {
+                    let x = currentTetro.positions[i][0] - centerX;
+                    let y = currentTetro.positions[i][1] - centerY;
+                    let x2;
+                    let y2;
+                    if (mode == "cw") {
+                        x2 = -y;
+                        y2 = x;
+                    } else {
+                        x2 = y;
+                        y2 = -x;
+                    }
+                    currentTetro.positions[i][0] = Math.round(x2 + centerX);
+                    currentTetro.positions[i][1] = Math.round(y2 + centerY);
+                }
+                if (mode == "cw") {
+                    currentTetro.orientation = (currentTetro.orientation + 1) % 4;
                 } else {
-                    // If no collision, reset the soft lock timer (if applicable)
-                    resetSoftLock();
+                    currentTetro.orientation = (currentTetro.orientation + 3) % 4;
+                }
+
+            }
+
+
+            // ----- DRAWING
+
+
+            function drawSquare(x, y, color, transparency = 1, s1 = bs) {
+                const imgX = x;
+                const imgY = y;
+
+
+                // Draw the block image
+                ctx.globalAlpha = transparency;
+                ctx.drawImage(blockImage, imgX, imgY, s1, s1);
+
+                // Set composite operation to 'multiply' for a better blend
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.75 * transparency; // Transparency of the tint
+
+                ctx.fillRect(imgX, imgY, s1, s1);
+
+                // Reset composite operation and alpha
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = 1.0;
+
+            }
+
+            function drawOutline(x, y, color, s1 = bs) {
+                ctx.globalAlpha = 0.3;
+                ctx.lineWidth = 2; // Width of the outline
+                ctx.strokeStyle = color;
+                ctx.shadowBlur = 2; // Adjust the blur radius for the glow effect
+                ctx.shadowColor = color; // The color of the glow
+                ctx.strokeRect(x, y, s1, s1);
+
+                // Reset shadow properties
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                ctx.globalAlpha = 1;
+            }
+
+            function drawDash(x, y) {
+                // Draw the block image
+                ctx.globalAlpha = dash;
+                ctx.drawImage(dashImage, x, y, bs, bs);
+                // Reset alpha
+                ctx.globalAlpha = 1.0;
+            }
+
+            function drawBackground(x, y) {
+                // Draw the block image
+                ctx.globalAlpha = 1;
+                ctx.drawImage(back, x + startingPositions[0], y + startingPositions[1], bs, bs);
+
+            }
+
+            function drawTetromino(tetromino) {
+                for (let i = 0; i < tetromino.positions.length; i++) {
+                    const x = tetromino.positions[i][0];
+                    const y = tetromino.positions[i][1];
+                    drawSquare((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color, soft);
+                    drawOutline((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color);
+
+                }
+
+                // Draw ghost tetromino
+                let ghost = JSON.parse(JSON.stringify(tetromino));
+                calcGhost(ghost);
+
+                for (let i = 0; i < ghost.positions.length; i++) {
+                    drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color, 0.);
+                    drawOutline((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color);
+
                 }
             }
 
+            function drawNext(tetromino, a, b) {
+
+                if (tetromino == null) return;
+
+                for (let i = 0; i < tetromino.positions.length; i++) {
+                    const [x, y] = tetromino.positions[i];
+                    drawSquare(x * (bs / 1.25) + a, y * (bs / 1.25) + b, tetromino.color, 1, bs / 1.25);
+                }
+
+            }
+
+            let drawInterval;
+
             let clearLineTime = 250;
             let flashDuration = clearLineTime / 3.5; // duration of the flash in milliseconds
-            let flashColor = "rgba(255, 255, 255, 0.8)"; // color and transparency of the flash
+            let flashColor = "rgba(255, 255, 255, 0.3)"; // color and transparency of the flash
 
             function flashCanvas() {
                 let flashCount = 0;
@@ -454,120 +850,12 @@
                         } else {
                             // End of the flash, clear the canvas
                             // Redraw the game state here if necessary
-                            canvas.style.backgroundColor = "darkgray"
+                            canvas.style.backgroundColor = "black"
                         }
                     }
                 }
 
                 requestAnimationFrame(drawFlash);
-            }
-
-            function clearLine() {
-
-                let clearedLineCount = 0;
-                let linesToClear = []; // To store the indices of lines to clear
-
-                // Check which lines need to be cleared
-                for (let i = 0; i < hTile; i++) {
-                    let allBlock = true;
-                    for (let j = 0; j < wTile; j++) {
-                        if (gameArray[i][j] === null) {
-                            allBlock = false;
-                            break;
-                        }
-                    }
-                    if (allBlock) {
-                        linesToClear.push(i);
-                        clearedLineCount++;
-                    }
-                }
-
-                if (linesToClear.length > 0) {
-
-                    clearInterval(gameInterval);
-                    gameInterval = null;
-
-                    if (linesToClear.length > 3) {
-                        flashCanvas();
-                        const tetrisclear = new Audio('tetrisclear.mp3');
-                        musicOn ? tetrisclear.play() : null;
-                    } else {
-                        const clearS = new Audio('clear.mp3');
-                        musicOn ? clearS.play() : null;
-                    }
-
-                    // Clear lines block by block with a delay
-                    let delay = clearLineTime / (wTile + 1); // Adjust delay for block by block clearing
-                    linesToClear.forEach((lineIndex, index) => {
-                        for (let j = 0; j < wTile; j++) {
-                            setTimeout(() => {
-                                // Clear the specified block
-                                gameArray[lineIndex][j] = null;
-                            }, j * delay);
-                        }
-
-                        // Shift the gameArray after the last block is cleared
-                        setTimeout(() => {
-                            for (let j = 0; j < wTile; j++) {
-                                for (let i = lineIndex; i > 0; i--) {
-                                    gameArray[i][j] = gameArray[i - 1][j];
-                                }
-                                // Clear the top row
-                                gameArray[0][j] = null;
-                            }
-                        }, wTile * delay + 0.01);
-                    });
-
-                    // clash
-                    updateGameParameters(clearedLineCount);
-                } else {
-                    lastLineCleared = 0;
-                }
-            }
-
-            function updateGameParameters(clearedLineCount) {
-                // Update score
-                if (clearedLineCount === 1) {
-                    score += 100 * level;
-                    messageCh("Single", 100);
-                } else if (clearedLineCount === 2) {
-                    score += 300 * level;
-                    messageCh("Double", 300);
-                } else if (clearedLineCount === 3) {
-                    score += 500 * level;
-                    messageCh("Triple", 500);
-                } else if (clearedLineCount === 4) {
-                    score += 800 * level;
-                    messageCh("TETRIS!", 800);
-                }
-
-
-                // Update level
-                if (Math.floor((clearedLineCount + lines) / 10) != (level - 1)) {
-                    level++;
-                    speed = speedTable[level - 1];
-                    messageCh("Level Up! " + level, "");
-                }
-
-                lines += clearedLineCount;
-
-                if (lastLineCleared != 0) {
-                    combo++;
-                } else {
-                    combo = 0;
-                }
-
-                lastLineCleared = clearedLineCount;
-
-                // Update combo score
-                if (combo > 0) {
-                    score += (combo + 1) * 50 * level;
-                    messageCh((combo + 1) + "x Combo!", (combo - 1) * 50 * level);
-                }
-
-                setTimeout(function () { clearInterval(gameInterval); gameInterval = setInterval(drop, speed) }, clearLineTime + 0.01);
-                // Remove any messages after a delay
-                setTimeout(messageRemove, messageDelay);
             }
 
             const speedTable = {
@@ -600,12 +888,13 @@
                 26: 33,
                 27: 33,
                 28: 33,
-                29: 32
+                29: 20
             };
 
             let messageDelay = 500;
             let message = "";
             let points = "";
+            let messageRemoveTimeout;
 
             function messageRemove() {
                 setTimeout(() => {
@@ -615,50 +904,54 @@
             }
 
             function messageCh(m, p) {
+                if (message != "") {
+                    clearTimeout(messageRemoveTimeout);
+                    // new timeout
+                }
                 message = m;
                 points = p;
+                messageRemoveTimeout = setTimeout(messageRemove, messageDelay);
             }
 
-            function endGame() {
-                document.removeEventListener('keydown', keyDownHandler, false);
-                const failS = new Audio('fail.mp3');
-                musicOn ? failS.play() : null;
-                ctx.clearRect(0, 0, cw, ch);
-                ctx.fillStyle = "black";
-                ctx.textAlign = "center";
-                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 - 30);
-                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + 10);
-                drawStartButton();
-                clearInterval(gameInterval);
-                clearInterval(drawInterval)
-            }
 
             function drawScore() {
                 ctx.textAlign = "left";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Roboto`;
-                ctx.fillStyle = "black";
+                ctx.fillStyle = "white";
 
                 const xPos = cw * 0.75; // Position the score text dynamically
                 const yPosStart = ch * 0.5;
                 const lineHeight = fontSize * 1.5; // Line height based on the font size
-
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Score: ", xPos, yPosStart);
                 ctx.fillText(score, xPos, yPosStart + lineHeight);
                 ctx.fillText("Level: " + level, xPos, yPosStart + 2 * lineHeight);
                 ctx.fillText("Lines: " + lines, xPos, yPosStart + 3 * lineHeight);
+                ctx.shadowBlur = 0;
+
             }
 
             function draw() {
+                const matrixOutlineWidth = 2; // Adjust this value to set the width of the outline
                 ctx.clearRect(0, 0, cw, ch);
-                ctx.beginPath();
-                ctx.rect(0, 0, wTile * bs, hTile * bs);
-                ctx.fillStyle = "black";
-                ctx.fill();
 
+                // Draw outline for Tetris matrix
+                ctx.strokeStyle = "cyan";
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "cyan"
+
+                ctx.lineWidth = matrixOutlineWidth;
+                ctx.strokeRect(startingPositions[0], startingPositions[1], wTile * bs, hTile * bs);
+                ctx.shadowBlur = 0;
+                // Draw background for Tetris matrix
+                ctx.fillStyle = "black";
+                ctx.fillRect(startingPositions[0], startingPositions[1], wTile * bs, hTile * bs);
+
+                // Draw score, buttons, and other UI elements
                 drawScore();
                 drawButtons();
-
 
                 // Draw tetrominoes from the array
                 for (let i = 0; i < hTile; i++) {
@@ -666,7 +959,9 @@
                         if (gameArray[i][j] == null) {
                             drawBackground(j * bs, i * bs);
                         } else {
-                            drawSquare(j * bs, i * bs, gameArray[i][j].color);
+                            drawSquare(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
+                            drawOutline(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
+
                         }
                     }
                 }
@@ -675,22 +970,24 @@
                 if (dash > 0) {
                     for (let i = 0; i < dashPos.length; i++) {
                         const [x, y] = dashPos[i];
-                        drawDash(x * bs, y * bs); // Assuming drawDash takes coordinates in pixels
+                        drawDash(startingPositions[0] + x * bs, startingPositions[1] + y * bs); // Assuming drawDash takes coordinates in pixels
                     }
                 }
 
                 // Draw next tetromino
-                ctx.fillStyle = "black";
+                ctx.fillStyle = "white";
                 ctx.textAlign = "left";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Roboto`;
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Next: ", cw * 0.75, ch * 0.05);
-                drawNext(nextTetro, cw * 0.75, ch * 0.07);
-                ctx.fillStyle = "black";
                 ctx.fillText("Hold: ", cw * 0.75, ch * 0.25);
-                drawNext(hold, cw * 0.75, ch * 0.27);
+                ctx.shadowBlur = 0;
+                drawNext(nextTetro, cw * 0.75, ch * 0.07);
+                ctx.fillStyle = "white";
+                drawNext(heldTetro, cw * 0.75, ch * 0.27);
                 drawTetromino(currentTetro);
-
 
                 // Draw message and points
                 ctx.fillStyle = "white";
@@ -698,51 +995,13 @@
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = "green";
                 ctx.globalAlpha = 0.5;
-                ctx.fillText(message, bs * wTile / 2, (ch - subbar) / 2 - 30);
-                ctx.fillText(points != "" ? "+" + points : "", bs * wTile / 2, (ch - subbar) / 2 + 10);
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = "cyan";
+                ctx.fillText(message, startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 - 30);
+                ctx.fillText(points != "" ? "+" + points : "", startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 + 10);
                 ctx.globalAlpha = 1;
                 ctx.shadowBlur = 0;
             }
-
-
-
-            // ----------------------- shuffle array
-            function shuffleArray(array) {
-                for (var i = array.length - 1; i > 0; i--) {
-                    var j = Math.floor(Math.random() * (i + 1));
-                    var temp = array[i];
-                    array[i] = array[j];
-                    array[j] = temp;
-                }
-            }
-
-            let paused = false;
-            function pauseGame() {
-                if (paused) {
-                    paused = false;
-                    const startm = new Audio('start.mp3');
-                    musicOn ? startm.play() : null;
-                    gameInterval = setInterval(drop, speed)
-                    drawInterval = setInterval(draw, 16)
-                } else {
-                    paused = true;
-                    //document.removeEventListener('keydown', keyDownHandler, false);
-                    const pause = new Audio('pause.mp3');
-                    musicOn ? pause.play() : null;
-                    ctx.clearRect(0, 0, cw, ch);
-                    ctx.fillStyle = "black";
-                    ctx.textAlign = "center";
-                    ctx.fillText("Paused...", cw / 2, (ch - subbar) / 2 - 30);
-                    clearInterval(gameInterval);
-                    clearInterval(drawInterval)
-                }
-            }
-
-            function muteGame() {
-                musicOn = !musicOn;
-            }
-
-
 
             // Define button properties
             let buttonWidth;
@@ -758,9 +1017,10 @@
                 { label: "🔄 Rotate", action: rotate },
                 { label: "⬅️ Left", action: moveLeft },
                 { label: "➡️ Right", action: moveRight },
-                { label: "⏬ Hard drop", action: () => hardDrop(currentTetro) },
-                { label: "⏸️ Pause", action: pauseGame },
-                { label: "🔇 Mute", action: muteGame }
+                { label: "⏬ Hard drop", action: hardDrop },
+                //{ label: "🔇 Mute", action: muteGame },
+                //{ label: "⏸️ Pause", action: pauseGame },
+                //{ label: "🔃 Rotate CCW", action: () => { rotate("ccw") } }
             ];
 
             // Calculate button sizes dynamically based on canvas size
@@ -789,7 +1049,6 @@
             function drawButtons() {
                 // Calculate button sizes dynamically
                 calculateButtonSizes();
-
                 // Draw each button and label
                 ctx.fillStyle = buttonColor;
                 const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
@@ -809,12 +1068,11 @@
                     ctx.fillText(button.label, x + buttonWidth / 2, y + buttonHeight / 2);
                     ctx.fillStyle = buttonColor;  // Reset fill color for next button
                 });
+
+
             }
 
-            // Function to check if a point is inside a button
-            function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
-                return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
-            }
+
 
             // Add event listeners for touch events
             canvas.addEventListener("touchstart", function (event) {
@@ -883,26 +1141,6 @@
                 });
             });
 
-
-
-
-            // Add event listener for button click
-            canvas.addEventListener("mousedown", function (event) {
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
-
-                // Check if clicked inside any button
-                buttons.forEach(button => {
-                    const x = buttonMargin + buttons.indexOf(button) % 3 * (buttonWidth + buttonMargin);
-                    const y = ch - subbar + Math.floor(buttons.indexOf(button) / 3) * (buttonHeight + buttonMargin);
-
-                    if (isInsideButton(mouseX, mouseY, x, y, buttonWidth, buttonHeight)) {
-                        handleButtonClick(button);
-                    }
-                });
-            });
-
             // Event listener for start button
             canvas.addEventListener("click", function (event) {
                 const rect = canvas.getBoundingClientRect();
@@ -932,17 +1170,25 @@
 
             function drawStartButton() {
                 calculateButtonSizes()
+
                 ctx.fillStyle = buttonColor;
-                ctx.drawImage(buttonImage, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight);
                 ctx.fillStyle = "black";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Arial`;
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = "cyan";
+                ctx.drawImage(buttonImage, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight);
+
                 ctx.fontWeight = 800;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
+                console.log(buttonWidth)
                 ctx.fillText("Start", cw / 2, ch / 2);
+                ctx.fillStyle = "white";
+                ctx.shadowBlur = 2;
+                ctx.fillText("TETRIS", cw / 2, ch / 5);
+                ctx.shadowBlur = 0;
             }
-
 
 
             // Function to check if a point is inside a button
@@ -950,67 +1196,91 @@
                 return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
             }
 
-            drawStartButton();
-
-            function rotatePoints() {
-
-
-                for (let i = 0; i < currentTetro.positions.length; i++) {
-
-                    let x = currentTetro.positions[i][0] - 1;
-                    let y = currentTetro.positions[i][1] - 1;
-
-                    let x2 = -y;
-                    let y2 = x;
-
-                    currentTetro.positions[i][0] = x2 + 1;
-                    currentTetro.positions[i][1] = y2 + 1;
-                }
-
-            }
-
-
-            document.addEventListener('touchstart', function (e) { e.preventDefault(); });
-            document.addEventListener('touchmove', function (e) { e.preventDefault(); });
-            document.addEventListener('touchend', function (e) { e.preventDefault(); });
+            document.addEventListener('keydown', keyDownHandler, false);
 
             function keyDownHandler(e) {
                 e.preventDefault();
                 if (e.key === "Right" || e.key === "ArrowRight") {
                     moveRight()
-                } else if (e.key === "Left" || e.key === "ArrowLeft") {
+                }
+                if (e.key === "Left" || e.key === "ArrowLeft") {
                     moveLeft()
-                } else if (e.key === "Down" || e.key === "ArrowDown") {
+                }
+                if (e.key === "Down" || e.key === "ArrowDown") {
                     dropButton();
-                } else if (e.key === "Up" || e.key === "ArrowUp") {
+                }
+                if (e.key === "Up" || e.key === "ArrowUp") {
                     rotate();
                 }
-                else if (e.key === " " || e.key === "Spacebar") {
+                if (e.key === " " || e.key === "Spacebar") {
                     if (gameInterval == null) {
                         startGame();
                     }
-                    hardDrop(currentTetro) // hard drop
-                } else if (e.key === "x") {
+                    hardDrop() // hard drop
+                }
+                if (e.key === "c") {
                     holdTetro();
-                } else if (e.key === "a") {
+                }
+                if (e.key === "x") {
+                    rotate();
+                }
+                if (e.key === "z") {
+                    rotate("ccw");
+                }
+                if (e.key === "a") {
                     clearInterval(gameInterval)
                     clearInterval(drawInterval);
                     resetSoftLock();
                     startGame();
-                } else if (e.key === "p") {
+                }
+                if (e.key === "Escape") {
                     pauseGame();
                 }
             }
 
 
 
+            // ----------------------- shuffle array
+            function shuffleArray(array) {
+                for (var i = array.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    var temp = array[i];
+                    array[i] = array[j];
+                    array[j] = temp;
+                }
+            }
 
+            let paused = false;
+            function pauseGame() {
+                if (paused) {
+                    paused = false;
+                    const startm = new Audio('start.mp3');
+                    musicOn ? startm.play() : null;
+                    gameInterval = setInterval(drop, speed)
+                    drawInterval = setInterval(draw, 16)
+                } else {
+                    ctx.shadowBlur = 2;
+                    ctx.shadowColor = "cyan"
+                    paused = true;
+                    const pause = new Audio('pause.mp3');
+                    musicOn ? pause.play() : null;
+                    ctx.clearRect(0, 0, cw, ch);
+                    ctx.fillStyle = "white";
+                    ctx.textAlign = "center";
+                    ctx.fillText("Paused...", cw / 2, (ch - subbar) / 2 - 30);
+                    clearInterval(gameInterval);
+                    clearInterval(drawInterval)
+                    ctx.shadowBlur = 0
+                    drawButtons();
+                }
+            }
+
+            function muteGame() {
+                musicOn = !musicOn;
+            }
         });
 
-
-
         const blockImage = new Image();
-        //blockImage.src = "data:image/png;base64,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";
         blockImage.src = "block.png"
         const back = new Image();
         back.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAREAAAESCAMAAADt3hESAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAB4UExURSYmJiQkJBoaGhMTEw8PDwsLCwcHBwQEBAAAAA4ODhkZGR8fHxYWFg0NDQMDAwwMDBUVFR4eHgoKCggICB0dHQICAgEBARwcHBERERgYGAUFBRQUFCUlJQYGBhsbGyEhIRISEhAQECAgIBcXFyMjIyIiIgkJCQAAAPTXCu8AAAAodFJOU////////////////////////////////////////////////////wC+qi4YAAAACXBIWXMAADLAAAAywAEoZFrbAAAD0klEQVR4Xu3Y0W0cOxBEUX5uCEyA+adokE1yhndGDmD6HujnScYDVKhmrV2aToXfSK+0orveEX4vNzsC/7ma1mqtv0+qtdb+YLxq44t6GvzffE6tL7/5H+9I+34c4aUpLxVpafLoHj0Zn0fO72TKo6sM4OxIroKEsybcmsY/nsLxmpwPSb6ChHpFcG5NzoZ0VyS3irSWN5Dfb9fivjWZA+lvyYphdSTjyhx2DjuR5IHsEV4PSepHJOxE5gFlr8j68GpFbmYS0ZH0r8gQkYyOWJEhooirsSLdmJt4SDyaYXyWj3fEowlxMv3LRELdW+PRhP6QxMtqIqE/JCZymFOT/q+923xHnJrLfkf4g7TG0PSt4Q/SsiNkIrQ/tPIHac3tNZHNqyG3huwImQi5NeTWkFdDbg3ZETIRcmvIrSGvhtwasiNkIuTWkFtDXg25NWRHyETIrSG3hrwacmvIjpCJkFtDbg15NeTWkB0hEyG3htwa8mrIrSE7QiZCbg25NeTVkFtDdoRMhNwacmvIqyG3huwImQi5NeTWkFdDbg3ZETIRcmvIrSGvhtwasiNkIuTWkFtDXg25NWRHyETIrSG3hrwacmvIjpCJkFtDbg15NeTWkB0hEyG3htwa8mrIrSE7QiZCbg25NeTVkFtDdoRMhNwacmvIqyG3huwImQi5NeTWkFdDbg3ZETIRcmvIrSGvhtwasiNkIuTWkFtDXg25NWRHyETIrSG3hrwacmvIjpCJkFtDbg15NeTWkB0hEyG3htwa8mrIrSE7QiZCbg25NeTVkFtDdoRMhNwacmvIqyG3huwImQi5NeTWkFdDbg3ZETIRcmvIrSGvhtwasiNkIuTWkFtDXg25NWRHyETIrSG3hrwacmvIjpCJkFtDbg15NeTWkB0hEyG3htwa8mrIrSE7QiZCbg25NeTVkFtDdoRMhNwacmvIqyG3huwImQi5NeTWkFdDbg3ZETIRcmvIraF1NY0/SKuMrSmlVP4kKztCZb0jdiTUNTXNREL1HYE6G1KaD0noVzO/+KOk+psaV+NDMvSjMZG7mcj48my6cTTxecSSDBHFuBoT6UYg8zOrH0m6WZHZEV+S/re8kUQkUlr6u6nzWFZJnJs2n5H9jmSPZAaytyb9U7Ju5rY1uZ+S8Wl1BrI7kvlTyRXItTXrP/lnU7gF8ihJykjuedy3ZiaS7nLqXpmZwXE1+WpSeyBM5BlJnkyu0d2//vGMrG8muZ1nHM+tub7dSqv199lcalzL6+/+VpKh39On8RcO2JqH61/rP/QVv9hf3q8ms5GaLq38AzNfpmOwOgUUAAAAAElFTkSuQmCC"
