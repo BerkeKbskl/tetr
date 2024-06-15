@@ -259,7 +259,7 @@
 
                 }
 
-
+                
                 isSoftLocked = false; // Reset soft lock flag
                 for (let i = 0; i < currentTetro.positions.length; i++) {
                     const [x, y] = currentTetro.positions[i];
@@ -278,10 +278,7 @@
                 }
 
                 clearLine();
-                clearInterval(gameInterval)
-                gameInterval = setInterval(drop, speed)
-                clearInterval(softAnimation);
-
+                resetSoftLock();
 
                 // Check if the T-spin conditions are met
                 if (occupiedCorners >= 3) {

@@ -268,8 +268,9 @@
 
                 }
 
-
+                resetSoftLock();
                 isSoftLocked = false; // Reset soft lock flag
+
                 for (let i = 0; i < currentTetro.positions.length; i++) {
                     const [x, y] = currentTetro.positions[i];
                     gameArray[y + currentTetro.tl[1]][x + currentTetro.tl[0]] = {
@@ -287,9 +288,7 @@
                 }
 
                 clearLine();
-                clearInterval(gameInterval)
-                gameInterval = setInterval(drop, speed)
-                clearInterval(softAnimation);
+                resetSoftLock();
 
 
                 // Check if the T-spin conditions are met
@@ -524,9 +523,9 @@
                 const holdS = new Audio('hold.mp3');
                 musicOn ? holdS.play() : null;
 
-                if (isSoftLocked) {
-                    resetSoftLock();
-                }
+
+                resetSoftLock();
+
 
                 let temp = currentTetro;
 
