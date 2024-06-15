@@ -130,6 +130,8 @@
             buttonImage.src = 'button.png';
             buttonPressedImage.src = 'button2.png';
 
+            const logo = new Image();
+            logo.src = 'tetrislogo.png';
 
             var crtLines = new Image();
             crtLines.src = "scanlines.png";
@@ -143,7 +145,7 @@
             // Start loading the image right away, not after the onload event.
 
             window.addEventListener('load', drawStartButton, false);
-           
+
             function fakeCRT() {
                 var glcanvas, source, srcctx, texture, w, h, hw, hh, w75;
 
@@ -306,15 +308,13 @@
 
             function drop() {
 
-
                 if (checkCollision(currentTetro, 0, 1) === true) {
                     if (!isSoftLocked) {
                         isSoftLocked = true;
                         soft = 1;
                         clearInterval(gameInterval); // Stop the game interval
                         beginningToLock = setTimeout(lock, lockDelay);
-                        softAnimation = setInterval(softTrans, 16); // Start softness animation
-                        gameInterval = setInterval(drop, speed);
+                        softAnimation = setInterval(softTrans, 16); // Start softness animation 
                     }
                 } else {
                     currentTetro.tl[1] += 1;
@@ -584,13 +584,13 @@
                 ctx.textAlign = "center";
                 ctx.shadowBlur = 2;
                 ctx.shadowColor = "cyan"
-                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.15);
-                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.10);
+                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.10);
+                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.07);
                 let x = document.cookie;
                 if (score > x) {
                     document.cookie = score;
                 }
-                ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + ch * -0.05);
+                ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + ch * -0.04);
                 ctx.shadowBlur = 0;
                 drawStartButton();
                 clearInterval(gameInterval);
@@ -786,7 +786,6 @@
                 // Draw the block image
                 ctx.globalAlpha = 1;
                 ctx.drawImage(back, x + startingPositions[0], y + startingPositions[1], bs, bs);
-
             }
 
             function drawTetromino(tetromino) {
@@ -795,7 +794,6 @@
                     const y = tetromino.positions[i][1];
                     drawSquare((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color, soft);
                     drawOutline((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color);
-
                 }
 
                 // Draw ghost tetromino
@@ -1068,7 +1066,7 @@
                     ctx.fillText(button.label, x + buttonWidth / 2, y + buttonHeight / 2);
                     ctx.fillStyle = buttonColor;  // Reset fill color for next button
                 });
-
+                drawPauseButton();
 
             }
 
@@ -1141,28 +1139,27 @@
                 });
             });
 
-            // Event listener for start button
+            // Event listener for start button (click)
             canvas.addEventListener("click", function (event) {
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = event.clientX - rect.left;
                 const mouseY = event.clientY - rect.top;
 
                 // Check if clicked inside start button
-                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
+                if (!gameInterval && isInsideButton(mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
                     // Start or restart the game
                     startGame();
                 }
             });
 
-
-            // Event listener for start button
+            // Event listener for start button (touch)
             canvas.addEventListener("touchstart", function (event) {
                 const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
+                const touchX = event.touches[0].clientX - rect.left;
+                const touchY = event.touches[0].clientY - rect.top;
 
-                // Check if clicked inside start button
-                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
+                // Check if touched inside start button
+                if (!gameInterval && isInsideButton(touchX, touchY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
                     // Start or restart the game
                     startGame();
                 }
@@ -1185,12 +1182,62 @@
                 console.log(buttonWidth)
                 ctx.fillText("Start", cw / 2, ch / 2);
                 ctx.fillStyle = "white";
-                ctx.shadowBlur = 2;
-                ctx.fillText("TETRIS", cw / 2, ch / 5);
                 ctx.shadowBlur = 0;
+                ctx.drawImage(logo, (cw - buttonHeight * 1.7) / 2, ch / 5, 3.66 * buttonHeight / 2, buttonHeight / 2);
+
+                //ctx.fillText("TETRIS", cw / 2, ch / 5);
+
             }
 
             drawStartButton();
+
+            // Event listener for pause button (click)
+            canvas.addEventListener("click", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if clicked inside pause button
+                const pauseButtonX = cw - buttonWidth * 0.75;
+                const pauseButtonY = ch / 1.5 + buttonMargin;
+                if (isInsideButton(mouseX, mouseY, pauseButtonX, pauseButtonY, buttonWidth / 2, buttonHeight)) {
+                    // Pause the game
+                    pauseGame();
+                }
+            });
+
+            // Event listener for pause button (touch)
+            canvas.addEventListener("touchstart", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const touchX = event.touches[0].clientX - rect.left;
+                const touchY = event.touches[0].clientY - rect.top;
+
+                // Check if touched inside pause button
+                const pauseButtonX = cw - buttonWidth * 0.75;
+                const pauseButtonY = ch / 1.5 + buttonMargin;
+                if (isInsideButton(touchX, touchY, pauseButtonX, pauseButtonY, buttonWidth / 2, buttonHeight)) {
+                    // Pause the game
+                    pauseGame();
+                }
+            });
+
+            function drawPauseButton() {
+                calculateButtonSizes();
+
+                const pauseButtonX = cw - buttonWidth * 0.75;
+                const pauseButtonY = ch / 1.5 + buttonMargin;
+                ctx.fillStyle = "black";
+                const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Arial`;
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan";
+                ctx.drawImage(buttonImage, pauseButtonX, pauseButtonY, buttonWidth / 2, buttonHeight);
+
+                ctx.fontWeight = 800;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("⏸️", pauseButtonX + buttonWidth / 4, pauseButtonY + buttonHeight / 2);
+            }
 
 
             // Function to check if a point is inside a button

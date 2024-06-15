@@ -6,6 +6,7 @@
     <title>Tetris</title>
     <style>
         body {
+
             overflow: hidden;
             touch-action: none;
             display: flex;
@@ -128,6 +129,8 @@
             buttonImage.src = 'button.png';
             buttonPressedImage.src = 'button2.png';
 
+            const logo = new Image();
+            logo.src = 'tetrislogo.png';
 
             var crtLines = new Image();
             crtLines.src = "scanlines.png";
@@ -141,7 +144,57 @@
             // Start loading the image right away, not after the onload event.
 
             window.addEventListener('load', drawStartButton, false);
-           
+
+            function fakeCRT() {
+                var glcanvas, source, srcctx, texture, w, h, hw, hh, w75;
+
+                // Try to create a WebGL canvas (will fail if WebGL isn't supported)
+                try {
+                    glcanvas = fx.canvas();
+                } catch (e) { return; }
+
+                // Assumes the first canvas tag in the document is the 2D game, but
+                // obviously we could supply a specific canvas element here.
+                source = document.getElementById("myCanvas");
+                srcctx = source.getContext("2d");
+
+                // This tells glfx what to use as a source image
+                texture = glcanvas.texture(source);
+
+                // Just setting up some details to tweak the bulgePinch effect
+                w = source.width;
+                h = source.height;
+                hw = w / 2;
+                hh = h / 2;
+                w75 = h * 1;
+
+                // Hide the source 2D canvas and put the WebGL Canvas in its place
+                source.parentNode.insertBefore(glcanvas, source);
+                source.style.display = 'none';
+                glcanvas.className = source.className;
+                glcanvas.id = source.id;
+                source.id = 'old_' + source.id;
+
+                // It is pretty silly to setup a separate animation timer loop here, but
+                // this lets us avoid monkeying with the source game's code.
+                // It would make way more sense to do the following directly in the source
+                // game's draw function in terms of performance.
+                setInterval(function () {
+                    // Give the source scanlines
+                    srcctx.drawImage(crtLines, 0, 0, w, h);
+
+                    // Load the latest source frame
+                    texture.loadContentsOf(source);
+
+                    // Apply WebGL magic
+                    glcanvas.draw(texture)
+                        .bulgePinch(hw, hh, w75, 0.05)
+                        .vignette(0.25, 0.44)
+                        .noise(0.02)
+                        .vibrance(0.1)
+                        .update();
+                }, Math.floor(1000 / 40));
+            }
 
             // with default positions
             const tetrominos = [
@@ -185,15 +238,9 @@
                 let occupiedCorners = 0;
                 if (currentTetro.name === "t") {
 
-
                     if (checkCollision(currentTetro, 0, 1) && checkCollision(currentTetro, 0, -1) && checkCollision(currentTetro, 1, 0) && checkCollision(currentTetro, -1, 0)) {
                         occupiedCorners = 3;
                     }
-
-                    console.log(checkCollision(currentTetro, 0, 1))
-                    console.log(checkCollision(currentTetro, 1, 0))
-                    console.log(checkCollision(currentTetro, 0, -1))
-                    console.log(checkCollision(currentTetro, -1, 0))
 
                     /*
                     corner1 = [tl[0], tl[1]];
@@ -252,7 +299,6 @@
 
             function drop() {
 
-
                 if (checkCollision(currentTetro, 0, 1) === true) {
                     if (!isSoftLocked) {
                         isSoftLocked = true;
@@ -260,7 +306,6 @@
                         clearInterval(gameInterval); // Stop the game interval
                         beginningToLock = setTimeout(lock, lockDelay);
                         softAnimation = setInterval(softTrans, 16); // Start softness animation
-                        gameInterval = setInterval(drop, speed);
                     }
                 } else {
                     currentTetro.tl[1] += 1;
@@ -470,9 +515,7 @@
                 const holdS = new Audio('hold.mp3');
                 musicOn ? holdS.play() : null;
 
-                if (isSoftLocked) {
-                    resetSoftLock();
-                }
+                resetSoftLock();
 
                 let temp = currentTetro;
 
@@ -488,7 +531,7 @@
             }
 
             function popQueue() {
-                console.log("popqueue called")
+
                 resetSoftLock();
 
                 if (bag.length === 0) {
@@ -522,24 +565,27 @@
             }
 
             function endGame() {
+                clearInterval(gameInterval);
+                gameInterval = null;
+                clearInterval(drawInterval)
                 document.removeEventListener('keydown', keyDownHandler, false);
                 const failS = new Audio('fail.mp3');
                 musicOn ? failS.play() : null;
                 ctx.clearRect(0, 0, cw, ch);
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
-                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.15);
-                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.10);
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan"
+                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.10);
+                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.07);
                 let x = document.cookie;
                 if (score > x) {
                     document.cookie = score;
                 }
-                ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + ch * -0.05);
+                ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + ch * -0.04);
                 ctx.shadowBlur = 0;
                 drawStartButton();
-                clearInterval(gameInterval);
-                gameInterval = null;
-                clearInterval(drawInterval)
+         
             }
 
 
@@ -634,6 +680,8 @@
 
             }
 
+
+
             function rotatePointsCw(mode) {
                 let centerX = 0;
                 let centerY = 0;
@@ -708,6 +756,8 @@
                 ctx.globalAlpha = 0.3;
                 ctx.lineWidth = 2; // Width of the outline
                 ctx.strokeStyle = color;
+                ctx.shadowBlur = 0; // Adjust the blur radius for the glow effect
+                ctx.shadowColor = color; // The color of the glow
                 ctx.strokeRect(x, y, s1, s1);
 
                 // Reset shadow properties
@@ -747,7 +797,6 @@
                 for (let i = 0; i < ghost.positions.length; i++) {
                     drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color, 0.2);
                     //drawOutline((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color);
-
                 }
             }
 
@@ -865,6 +914,8 @@
                 const xPos = cw * 0.75; // Position the score text dynamically
                 const yPosStart = ch * 0.5;
                 const lineHeight = fontSize * 1.5; // Line height based on the font size
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Score: ", xPos, yPosStart);
                 ctx.fillText(score, xPos, yPosStart + lineHeight);
                 ctx.fillText("Level: " + level, xPos, yPosStart + 2 * lineHeight);
@@ -879,6 +930,8 @@
 
                 // Draw outline for Tetris matrix
                 ctx.strokeStyle = "cyan";
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan"
 
                 ctx.lineWidth = matrixOutlineWidth;
                 ctx.strokeRect(startingPositions[0], startingPositions[1], wTile * bs, hTile * bs);
@@ -899,6 +952,7 @@
                         } else {
                             drawSquare(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
                             //drawOutline(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
+
                         }
                     }
                 }
@@ -916,6 +970,8 @@
                 ctx.textAlign = "left";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Roboto`;
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Next: ", cw * 0.75, ch * 0.05);
                 ctx.fillText("Hold: ", cw * 0.75, ch * 0.25);
                 ctx.shadowBlur = 0;
@@ -927,8 +983,11 @@
                 // Draw message and points
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "green";
                 ctx.globalAlpha = 0.5;
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan";
                 ctx.fillText(message, startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 - 30);
                 ctx.fillText(points != "" ? "+" + points : "", startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 + 10);
                 ctx.globalAlpha = 1;
@@ -1001,10 +1060,8 @@
                     ctx.fillStyle = buttonColor;  // Reset fill color for next button
                 });
 
-
+                drawPauseButton();
             }
-
-
 
             // Add event listeners for touch events
             canvas.addEventListener("touchstart", function (event) {
@@ -1073,28 +1130,27 @@
                 });
             });
 
-            // Event listener for start button
+            // Event listener for start button (click)
             canvas.addEventListener("click", function (event) {
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = event.clientX - rect.left;
                 const mouseY = event.clientY - rect.top;
 
                 // Check if clicked inside start button
-                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
+                if (!gameInterval && isInsideButton(mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
                     // Start or restart the game
                     startGame();
                 }
             });
 
-
-            // Event listener for start button
+            // Event listener for start button (touch)
             canvas.addEventListener("touchstart", function (event) {
                 const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
+                const touchX = event.touches[0].clientX - rect.left;
+                const touchY = event.touches[0].clientY - rect.top;
 
-                // Check if clicked inside start button
-                if (!gameInterval && (mouseX, mouseY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
+                // Check if touched inside start button
+                if (!gameInterval && isInsideButton(touchX, touchY, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight)) {
                     // Start or restart the game
                     startGame();
                 }
@@ -1107,6 +1163,8 @@
                 ctx.fillStyle = "black";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Arial`;
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan";
                 ctx.drawImage(buttonImage, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight);
 
                 ctx.fontWeight = 800;
@@ -1115,12 +1173,62 @@
                 console.log(buttonWidth)
                 ctx.fillText("Start", cw / 2, ch / 2);
                 ctx.fillStyle = "white";
-                ctx.fillText("TETRIS", cw / 2, ch / 5);
                 ctx.shadowBlur = 0;
+                ctx.drawImage(logo, (cw - buttonHeight * 1.7) / 2, ch / 5, 3.66 * buttonHeight / 2, buttonHeight / 2);
+
+                //ctx.fillText("TETRIS", cw / 2, ch / 5);
+
             }
 
             drawStartButton();
 
+            // Event listener for pause button (click)
+            canvas.addEventListener("click", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if clicked inside pause button
+                const pauseButtonX = cw - buttonWidth * 0.75;
+                const pauseButtonY = ch / 1.5 + buttonMargin;
+                if (isInsideButton(mouseX, mouseY, pauseButtonX, pauseButtonY, buttonWidth / 2, buttonHeight)) {
+                    // Pause the game
+                    pauseGame();
+                }
+            });
+
+            // Event listener for pause button (touch)
+            canvas.addEventListener("touchstart", function (event) {
+                const rect = canvas.getBoundingClientRect();
+                const touchX = event.touches[0].clientX - rect.left;
+                const touchY = event.touches[0].clientY - rect.top;
+
+                // Check if touched inside pause button
+                const pauseButtonX = cw - buttonWidth * 0.75;
+                const pauseButtonY = ch / 1.5 + buttonMargin;
+                if (isInsideButton(touchX, touchY, pauseButtonX, pauseButtonY, buttonWidth / 2, buttonHeight)) {
+                    // Pause the game
+                    pauseGame();
+                }
+            });
+
+            function drawPauseButton() {
+                calculateButtonSizes();
+
+                const pauseButtonX = cw - buttonWidth * 0.75;
+                const pauseButtonY = ch / 1.5 + buttonMargin;
+                ctx.fillStyle = "black";
+                const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Arial`;
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = "cyan";
+                ctx.drawImage(buttonImage, pauseButtonX, pauseButtonY, buttonWidth / 2, buttonHeight);
+
+                ctx.fontWeight = 800;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("⏸️", pauseButtonX + buttonWidth / 4, pauseButtonY + buttonHeight / 2);
+            }
 
             // Function to check if a point is inside a button
             function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
@@ -1161,14 +1269,15 @@
                 if (e.key === "a") {
                     clearInterval(gameInterval)
                     clearInterval(drawInterval);
-                    resetSoftLock();
                     startGame();
                 }
                 if (e.key === "Escape") {
                     pauseGame();
                 }
+                if (e.key === "m") {
+                    muteGame();
+                }
             }
-
 
 
             // ----------------------- shuffle array
@@ -1190,6 +1299,8 @@
                     gameInterval = setInterval(drop, speed)
                     drawInterval = setInterval(draw, 16)
                 } else {
+                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = "cyan"
                     paused = true;
                     const pause = new Audio('pause.mp3');
                     musicOn ? pause.play() : null;
@@ -1200,7 +1311,7 @@
                     clearInterval(gameInterval);
                     clearInterval(drawInterval)
                     ctx.shadowBlur = 0
-                    drawButtons();
+                    drawPauseButton();
                 }
             }
 
