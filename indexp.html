@@ -6,6 +6,7 @@
     <title>Tetris</title>
     <style>
         body {
+
             overflow: hidden;
             touch-action: none;
             display: flex;
@@ -56,6 +57,7 @@
         <canvas id="myCanvas" width="900" height="1600"></canvas>
     </div>
 
+    <script src="glfx.js"></script>
     <script>
 
         document.addEventListener("DOMContentLoaded", function () {
@@ -100,7 +102,7 @@
             let cw = canvas.width;
 
             const subbar = ch * 0.20;
-            let startingPositions = [30, 30]
+            let startingPositions = [15, 20]
             const bs = (ch - startingPositions[0] * 2 - subbar) / hTile; // size
 
             let speed;
@@ -142,6 +144,58 @@
 
             window.addEventListener('load', drawStartButton, false);
            
+            function fakeCRT() {
+                var glcanvas, source, srcctx, texture, w, h, hw, hh, w75;
+
+                // Try to create a WebGL canvas (will fail if WebGL isn't supported)
+                try {
+                    glcanvas = fx.canvas();
+                } catch (e) { return; }
+
+                // Assumes the first canvas tag in the document is the 2D game, but
+                // obviously we could supply a specific canvas element here.
+                source = document.getElementById("myCanvas");
+                srcctx = source.getContext("2d");
+
+                // This tells glfx what to use as a source image
+                texture = glcanvas.texture(source);
+
+                // Just setting up some details to tweak the bulgePinch effect
+                w = source.width;
+                h = source.height;
+                hw = w / 2;
+                hh = h / 2;
+                w75 = h * 1;
+
+                // Hide the source 2D canvas and put the WebGL Canvas in its place
+                source.parentNode.insertBefore(glcanvas, source);
+                source.style.display = 'none';
+                glcanvas.className = source.className;
+                glcanvas.id = source.id;
+                source.id = 'old_' + source.id;
+
+                // It is pretty silly to setup a separate animation timer loop here, but
+                // this lets us avoid monkeying with the source game's code.
+                // It would make way more sense to do the following directly in the source
+                // game's draw function in terms of performance.
+                setInterval(function () {
+                    // Give the source scanlines
+                    srcctx.drawImage(crtLines, 0, 0, w, h);
+
+                    // Load the latest source frame
+                    texture.loadContentsOf(source);
+
+                    // Apply WebGL magic
+                    glcanvas.draw(texture)
+                        .bulgePinch(hw, hh, w75, 0.05)
+                        .vignette(0.25, 0.44)
+                        .noise(0.02)
+                        .vibrance(0.1)
+                        .update();
+                }, Math.floor(1000 / 40));
+            }
+
+
 
             // with default positions
             const tetrominos = [
@@ -528,6 +582,8 @@
                 ctx.clearRect(0, 0, cw, ch);
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.15);
                 ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.10);
                 let x = document.cookie;
@@ -708,6 +764,8 @@
                 ctx.globalAlpha = 0.3;
                 ctx.lineWidth = 2; // Width of the outline
                 ctx.strokeStyle = color;
+                ctx.shadowBlur = 2; // Adjust the blur radius for the glow effect
+                ctx.shadowColor = color; // The color of the glow
                 ctx.strokeRect(x, y, s1, s1);
 
                 // Reset shadow properties
@@ -736,7 +794,7 @@
                     const x = tetromino.positions[i][0];
                     const y = tetromino.positions[i][1];
                     drawSquare((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color, soft);
-                    //drawOutline((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color);
+                    drawOutline((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color);
 
                 }
 
@@ -745,8 +803,8 @@
                 calcGhost(ghost);
 
                 for (let i = 0; i < ghost.positions.length; i++) {
-                    drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color, 0.2);
-                    //drawOutline((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color);
+                    drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color, 0.);
+                    drawOutline((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color);
 
                 }
             }
@@ -865,6 +923,8 @@
                 const xPos = cw * 0.75; // Position the score text dynamically
                 const yPosStart = ch * 0.5;
                 const lineHeight = fontSize * 1.5; // Line height based on the font size
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Score: ", xPos, yPosStart);
                 ctx.fillText(score, xPos, yPosStart + lineHeight);
                 ctx.fillText("Level: " + level, xPos, yPosStart + 2 * lineHeight);
@@ -879,6 +939,8 @@
 
                 // Draw outline for Tetris matrix
                 ctx.strokeStyle = "cyan";
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "cyan"
 
                 ctx.lineWidth = matrixOutlineWidth;
                 ctx.strokeRect(startingPositions[0], startingPositions[1], wTile * bs, hTile * bs);
@@ -898,7 +960,8 @@
                             drawBackground(j * bs, i * bs);
                         } else {
                             drawSquare(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
-                            //drawOutline(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
+                            drawOutline(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
+
                         }
                     }
                 }
@@ -916,6 +979,8 @@
                 ctx.textAlign = "left";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Roboto`;
+                ctx.shadowBlur = 2;
+                ctx.shadowColor = "cyan"
                 ctx.fillText("Next: ", cw * 0.75, ch * 0.05);
                 ctx.fillText("Hold: ", cw * 0.75, ch * 0.25);
                 ctx.shadowBlur = 0;
@@ -927,8 +992,11 @@
                 // Draw message and points
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
+                ctx.shadowBlur = 10;
                 ctx.shadowColor = "green";
                 ctx.globalAlpha = 0.5;
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = "cyan";
                 ctx.fillText(message, startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 - 30);
                 ctx.fillText(points != "" ? "+" + points : "", startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 + 10);
                 ctx.globalAlpha = 1;
@@ -1107,6 +1175,8 @@
                 ctx.fillStyle = "black";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Arial`;
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = "cyan";
                 ctx.drawImage(buttonImage, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight);
 
                 ctx.fontWeight = 800;
@@ -1115,6 +1185,7 @@
                 console.log(buttonWidth)
                 ctx.fillText("Start", cw / 2, ch / 2);
                 ctx.fillStyle = "white";
+                ctx.shadowBlur = 2;
                 ctx.fillText("TETRIS", cw / 2, ch / 5);
                 ctx.shadowBlur = 0;
             }
@@ -1167,6 +1238,9 @@
                 if (e.key === "Escape") {
                     pauseGame();
                 }
+                if (e.key === "m") {
+                    muteGame();
+                }
             }
 
 
@@ -1190,6 +1264,8 @@
                     gameInterval = setInterval(drop, speed)
                     drawInterval = setInterval(draw, 16)
                 } else {
+                    ctx.shadowBlur = 2;
+                    ctx.shadowColor = "cyan"
                     paused = true;
                     const pause = new Audio('pause.mp3');
                     musicOn ? pause.play() : null;
