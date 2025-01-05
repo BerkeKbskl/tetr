@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Sans+Condensed:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+        rel="stylesheet">
+    <meta charset="utf-8">
+    <title>Tetris</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: black;
+            height: 100vh;
+            width: 100vw;
+            font-family: "Fira Sans Condensed";
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            background-color: black;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="canvas-container">
+        <canvas id="myCanvas"></canvas>
+    </div>
+
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+
+
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
+
+
+            let gameInterval;
+
+            let score = 0;
+            let lines = 0;
+            let level = 1;
+            const wTile = 10;
+            const hTile = 20;
+
+            let ch, cw, subbar, bs;
+            resizeCanvas();
+
+
+            window.addEventListener("resize", resizeCanvas);
+
+            function resizeCanvas() {
+                // Get device pixel ratio
+                const dpr = window.devicePixelRatio || 1;
+
+                // Set the display size (css pixels).
+                canvas.style.width = window.innerWidth + 'px';
+                canvas.style.height = window.innerHeight + 'px';
+
+                // Set the canvas size (scaled to device pixels).
+                canvas.width = window.innerWidth * dpr;
+                canvas.height = window.innerHeight * dpr;
+
+
+                // Optionally, you can clear the canvas here if necessary
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ch = canvas.height;
+                cw = canvas.width;
+                // You can now draw on the canvas as usual
+
+                subbar = ch * 0;
+                startingPositions = [25, 25]
+                bs = (ch - startingPositions[0] * 2 - subbar) / hTile; // size
+                startingPositions[0] = cw / 2 - bs * wTile / 2 - startingPositions[0] / 2
+
+            }
+
+
+
+            let speed;
+
+            let lastLineCleared = 0;
+            let combo = 0;
+
+
+            // tetrominos
+            let currentTetro;
+            let heldTetro;
+            let gameArray = Array.from({ length: hTile }, () => Array(wTile).fill(null));
+            let bag = [];
+
+            let musicOn = true;
+
+            const buttonImage = new Image();
+            const buttonPressedImage = new Image();
+            buttonImage.src = 'button.png';
+            buttonPressedImage.src = 'button2.png';
+
+            const logo = new Image();
+            logo.src = 'tetrislogo.png';
+
+
+
+
+            // with default positions
+            const tetrominos = [
+                { name: "i", tl: [0, 0], positions: [[0, 1], [1, 1], [2, 1], [3, 1]], color: "#00A1DE", orientation: 0 },
+                { name: "l", tl: [0, 0], positions: [[2, 0], [0, 1], [1, 1], [2, 1]], color: "#FF6319", orientation: 0 },
+                { name: "j", tl: [0, 0], positions: [[0, 0], [0, 1], [1, 1], [2, 1]], color: "#0039A6", orientation: 0 },
+                { name: "o", tl: [0, 0], positions: [[0, 0], [1, 0], [0, 1], [1, 1]], color: "yellow", orientation: 0 },
+                { name: "z", tl: [0, 0], positions: [[0, 0], [1, 0], [1, 1], [2, 1]], color: "#C60C30", orientation: 0 },
+                { name: "t", tl: [0, 0], positions: [[1, 0], [0, 1], [1, 1], [2, 1]], color: "#A626AA", orientation: 0 },
+                { name: "s", tl: [0, 0], positions: [[2, 0], [0, 1], [1, 1], [1, 0]], color: "#00AF3F", orientation: 0 }
+            ];
+            document.addEventListener('keydown', keyDownHandler, false);
+
+            function countdown(func = startGame) {
+
+
+
+                ctx.clearRect(0, 0, cw, ch);
+
+                setTimeout(func, 3000);
+                ctx.fillText("3", cw / 2, (ch - subbar) / 2 - 30);
+                setTimeout(() => { ctx.clearRect(0, 0, cw, ch); ctx.fillText("2", cw / 2, (ch - subbar) / 2 - 30); }, 1000);
+                setTimeout(() => { ctx.clearRect(0, 0, cw, ch); ctx.fillText("1", cw / 2, (ch - subbar) / 2 - 30); }, 2000);
+            }
+
+            function startGame() {
+                ctx.filter = "blur(0px)"
+                const startm = new Audio('start.mp3');
+                musicOn ? startm.play() : null;
+
+                gameRunning = true;
+
+                gameArray = Array.from({ length: hTile }, () => Array(wTile).fill(null));
+                bag = []
+                currentTetro = null;
+                score = lines = 0;
+                level = 1;
+                heldTetro = null;
+                // also restart
+                resetSoftLock();
+                clearTimeout(softAnimation)
+                popQueue();
+                speed = speedTable[0];
+                drawInterval = setInterval(draw, 16);
+                resume();
+            }
+
+            let soft = 1;
+            let softAnimation; // ssoftness animation call
+            let isSoftLocked = false; // Flag to track soft lock status
+            let lockDelay = 500;
+            let beginningToLock;
+
+            function lock() {
+                let occupiedCorners = 0;
+                if (currentTetro.name === "t") {
+                    if (checkCollision(currentTetro, 0, 1) && checkCollision(currentTetro, 0, -1) && checkCollision(currentTetro, 1, 0) && checkCollision(currentTetro, -1, 0)) {
+                        occupiedCorners = 3;
+                    }
+                }
+
+                for (let i = 0; i < currentTetro.positions.length; i++) {
+                    const [x, y] = currentTetro.positions[i];
+                    gameArray[y + currentTetro.tl[1]][x + currentTetro.tl[0]] = {
+                        name: "standalone",
+                        color: currentTetro.color
+                    };
+                    const glowPos = [x + currentTetro.tl[0], y + currentTetro.tl[1]];
+                    glows.push(glowPos)
+                    setTimeout(() => {
+                        const index = glows.findIndex(pos => pos[0] === glowPos[0] && pos[1] === glowPos[1]);
+                        if (index > -1) {
+                            glows.splice(index, 1);
+                        }
+                    }, 500);
+                }
+
+                let harddropS = new Audio('harddrop.mp3');
+
+                if (!popQueue()) {
+                    return;
+                }
+
+                clearLine();
+
+                if (occupiedCorners >= 3) {
+                    const tspin = new Audio('tspin.mp3');
+                    harddropS = new Audio('harddrop2.mp3');
+                    musicOn ? tspin.play() : null;
+                    messageCh("T-Spin", 400 * level);
+                    score += 400 * level;
+                }
+
+                musicOn ? harddropS.play() : null;
+                soft = 1;
+                resume();
+
+                glow = 1; // Reset glow level
+                const interval = setInterval(() => {
+                    if (glow > 0) {
+                        glow -= 16 / 500;
+                    } else {
+                        glow = 0;
+                        clearInterval(interval);
+                    }
+                }, 16);
+            }
+
+            let glows = []
+            let glow = 0;
+
+            function drop() {
+
+                if (checkCollision(currentTetro, 0, 1) === true) {
+                    if (!isSoftLocked) {
+                        isSoftLocked = true;
+                        soft = 1;
+                        stop();
+                        beginningToLock = setTimeout(lock, lockDelay);
+                        softAnimation = setInterval(softTrans, 16); // Start softness animation 
+                    }
+                } else {
+                    currentTetro.tl[1] += 1;
+                    resetSoftLock();
+                }
+            }
+
+            function softTrans() {
+                if (soft < 0) {
+                    soft = 1;
+                } else {
+                    soft -= (16 / lockDelay);
+                }
+            }
+
+            function moveRight(margin = 1) {
+                if (checkCollision(currentTetro, margin, 0) === false) {
+                    const moveS = new Audio('move.mp3');
+                    musicOn ? moveS.play() : null;
+                    currentTetro.tl[0] += margin;
+                    resetSoftLock();
+                }
+
+            }
+
+            function moveLeft(margin = 1) {
+                if (checkCollision(currentTetro, -margin, 0) === false) {
+                    const moveS = new Audio('move.mp3');
+                    musicOn ? moveS.play() : null;
+                    currentTetro.tl[0] -= margin;
+                    resetSoftLock();
+                }
+            }
+
+            let msp;
+
+            function wallDrag() {
+            }
+
+            function clearLine() {
+                stop();
+                let clearedLineCount = 0;
+                let linesToClear = []; // To store the indices of lines to clear
+
+                // Check which lines need to be cleared
+                for (let i = 0; i < hTile; i++) {
+                    let allBlock = true;
+                    for (let j = 0; j < wTile; j++) {
+                        if (gameArray[i][j] === null) {
+                            allBlock = false;
+                            break;
+                        }
+                    }
+                    if (allBlock) {
+                        linesToClear.push(i);
+                        clearedLineCount++;
+                    }
+                }
+
+                if (linesToClear.length > 0) {
+                    if (linesToClear.length > 3) {
+                        const tetrisclear = new Audio('tetrisclear.mp3');
+                        musicOn ? tetrisclear.play() : null;
+                    } else {
+                        const clearS = new Audio('clear.mp3');
+                        musicOn ? clearS.play() : null;
+                    }
+
+                    // Clear lines block by block immediately
+                    linesToClear.forEach(lineIndex => {
+                        for (let j = 0; j < wTile; j++) {
+                            // Clear the specified block
+                            gameArray[lineIndex][j] = null;
+                        }
+
+                        // Shift the gameArray after the blocks are cleared
+                        for (let i = lineIndex; i > 0; i--) {
+                            for (let j = 0; j < wTile; j++) {
+                                gameArray[i][j] = gameArray[i - 1][j];
+                            }
+                        }
+                        // Clear the top row
+                        for (let j = 0; j < wTile; j++) {
+                            gameArray[0][j] = null;
+                        }
+                    });
+                    updateGameParameters(clearedLineCount);
+                } else {
+                    lastLineCleared = 0;
+                }
+            }
+
+
+            function updateGameParameters(clearedLineCount) {
+                // Update score
+                if (clearedLineCount === 1) {
+                    score += 100 * level;
+                    messageCh("Single", 100);
+                } else if (clearedLineCount === 2) {
+                    score += 300 * level;
+                    messageCh("Double", 300);
+                } else if (clearedLineCount === 3) {
+                    score += 500 * level;
+                    messageCh("Triple", 500);
+                } else if (clearedLineCount === 4) {
+                    score += 800 * level;
+                    messageCh("TETRIS!", 800);
+                }
+
+                // Update level
+                if (Math.floor((clearedLineCount + lines) / 10) != (level - 1)) {
+                    level++;
+                    speed = speedTable[level - 1];
+                    messageCh("Level Up! " + level, "");
+                    const levelup = new Audio('levelup.mp3');
+                    musicOn ? levelup.play() : null;
+                }
+
+                lines += clearedLineCount;
+
+                if (lastLineCleared != 0) {
+                    combo++;
+                } else {
+                    combo = 0;
+                }
+
+                lastLineCleared = clearedLineCount;
+
+                // Update combo score
+                if (combo > 0) {
+                    if (combo > 6) {
+                        const comboS = new Audio('combo6.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo % 6 == 1) {
+                        const comboS = new Audio('combo1.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo % 6 == 2) {
+                        const comboS = new Audio('combo2.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo % 6 == 3) {
+                        const comboS = new Audio('combo3.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo % 6 == 4) {
+                        const comboS = new Audio('combo4.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    if (combo % 6 == 5) {
+                        const comboS = new Audio('combo5.mp3');
+                        musicOn ? comboS.play() : null;
+                    }
+                    
+                    score += (combo + 1) * 50 * level;
+                    messageCh((combo + 1) + "x Combo!", (combo - 1) * 50 * level);
+                }
+                // Remove any messages after a delay
+
+            }
+
+            function dropButton() {
+                if (isSoftLocked) {
+                    resetSoftLock();
+                    hardDrop();
+                } else {
+                    drop();
+                    const moveS = new Audio('move.mp3');
+                    musicOn ? moveS.play() : null;
+                    score += 1;
+                }
+            }
+
+            function resetSoftLock() {
+                if (isSoftLocked) {
+                    isSoftLocked = false;
+                    clearInterval(softAnimation);
+                    clearTimeout(beginningToLock);
+                    soft = 1;
+                    stop();
+                    resume();
+                }
+            }
+
+            let stopped = true;
+            let gameRunning = false;
+
+            function stop() {
+                if (!stopped) {
+                    clearInterval(gameInterval);
+                    stopped = !stopped;
+                }
+
+            }
+            function resume() {
+                if (stopped == true) {
+                    gameInterval = setInterval(drop, speed)
+                    stopped = !stopped;
+                }
+            }
+
+            function hardDrop() {
+                let cells = 0;
+                while (checkCollision(currentTetro, 0, 1) === false) {
+                    currentTetro.tl[1] += 1;
+                    cells++;
+                }
+
+                // Put the tetromino
+                lock();
+                score += 2 * cells;
+            }
+
+
+            function calcGhost(tetro) {
+                while (checkCollision(tetro, 0, 1) === false) {
+                    tetro.tl[1] += 1;
+                }
+            }
+
+            let holdLock = false;
+
+            function holdTetro() {
+                if (holdLock === true) return;
+
+                const holdS = new Audio('hold.mp3');
+                musicOn ? holdS.play() : null;
+
+
+                resetSoftLock();
+
+                if (heldTetro === null) {
+                    heldTetro = currentTetro
+                    popQueue();
+                } else
+                    [currentTetro, heldTetro] = [heldTetro, currentTetro]
+
+                currentTetro.tl = overlayPosition();
+                holdLock = true;
+            }
+
+            function popQueue() {
+                resetSoftLock();
+
+                if (bag.length === 0) {
+                    bag = JSON.parse(JSON.stringify(tetrominos));
+                    shuffleArray(bag);
+                }
+
+                if (bag.length === 5) {
+                    bag2 = JSON.parse(JSON.stringify(tetrominos));
+                    shuffleArray(bag2);
+                    bag = bag2.concat(bag);
+                }
+
+                currentTetro = bag.pop();
+                holdLock = false;
+
+                if (checkCollision(currentTetro, 4, 0) !== false) {
+                    endGame();
+                    return false;
+                } else {
+                    currentTetro.tl = overlayPosition();
+                }
+
+                return true;
+            }
+
+
+
+            function overlayPosition() {
+                if (currentTetro.name == "i") return [3, -1]
+                return [3, 0]
+
+            }
+
+            function endGame() {
+                //document.removeEventListener('keydown', keyDownHandler, false);
+                const failS = new Audio('fail.mp3');
+                musicOn ? failS.play() : null;
+                gameRunning = false;
+
+                ctx.filter = "blur(16px)"
+                draw();
+                ctx.filter = "blur(0px)"
+
+                const fontSize = Math.min(cw, ch) / 25; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Fira Sans Condensed`;
+                ctx.fillStyle = "white";
+
+                const xPos = cw / 2 - 2 * bs - startingPositions[0] / 2
+                const yPosStart = ch * 0.5;
+                const lineHeight = fontSize * 1.5; // Line height based on the font size
+
+
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + lineHeight * -2);
+                ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + lineHeight * -1);
+                let x = document.cookie;
+                if (score > x) {
+                    document.cookie = score;
+                }
+                ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + lineHeight * 0);
+
+
+                stop();
+                clearInterval(drawInterval)
+            }
+
+            function drawFrame() {
+                const matrixOutlineWidth = 3; // Adjust this value to set the width of the outline
+                ctx.clearRect(0, 0, cw, ch);
+
+                // Draw outline for Tetris matrix
+                ctx.strokeStyle = "white";
+
+                ctx.lineWidth = matrixOutlineWidth;
+
+                ctx.shadowColor = "white"
+                ctx.strokeRect(startingPositions[0], startingPositions[1], wTile * bs, hTile * bs);
+                ctx.shadowBlur = 0;
+                // Draw background for Tetris matrix
+                ctx.fillStyle = "black";
+                ctx.fillRect(startingPositions[0], startingPositions[1], wTile * bs, hTile * bs);
+                ctx.globalAlpha = 1
+                // Draw score, buttons, and other UI elements
+                drawScore();
+                //drawButtons();
+
+
+
+
+                // Draw next tetromino
+                ctx.fillStyle = "white";
+                ctx.textAlign = "left";
+
+                let w = startingPositions[0] + bs * wTile / 2 + 6 * bs
+                ctx.fillText("🡗 Next", w, 0.8 * bs + startingPositions[1]);
+
+                ctx.save();
+                // Set fill color
+                ctx.fillStyle = "white";
+
+                // Set shadow properties for glow effect
+                ctx.shadowColor = "white"; // Same color as the rectangle for glow
+                ctx.shadowBlur = 0; // Amount of blur to create the glow effect
+                ctx.shadowOffsetX = 0; // No horizontal offset
+                ctx.shadowOffsetY = 0; // No vertical offset
+                // Fill rectangle with solid color
+                ctx.fillRect(w, 1.2 * bs + startingPositions[1], 4 * bs, ch * 0.002);
+                ctx.restore();
+
+                drawNext(bag[bag.length - 1], w, 2 * bs + startingPositions[1]);
+                drawNext(bag[bag.length - 2], w, 5 * bs + startingPositions[1]);
+                drawNext(bag[bag.length - 3], w, 8 * bs + startingPositions[1]);
+                drawNext(bag[bag.length - 4], w, 11 * bs + startingPositions[1]);
+                drawNext(bag[bag.length - 5], w, 14 * bs + startingPositions[1]);
+
+                let w2 = startingPositions[0] - bs * 5
+                drawNext(heldTetro, w2, 2 * bs + startingPositions[1]);
+                ctx.fillStyle = "white";
+                ctx.fillText("🡓 Hold", w2, 0.8 * bs + startingPositions[1]);
+
+                ctx.save();
+                // Set fill color
+                ctx.fillStyle = "white";
+                // Set shadow properties for glow effect
+                ctx.shadowColor = heldTetro ? heldTetro.color : "white"; // Same color as the rectangle for glow
+                ctx.shadowBlur = 0; // Amount of blur to create the glow effect
+                ctx.shadowOffsetX = 0; // No horizontal offset
+                ctx.shadowOffsetY = 0; // No vertical offset
+                // Fill rectangle with solid color
+                ctx.fillRect(w2, 1.2 * bs + startingPositions[1], 4 * bs, ch * 0.002);
+                ctx.restore();
+            }
+
+
+            function checkCollision(tetro, x, y) {
+                // x, y is the vector for the potential next move
+                for (let i = 0; i < tetro.positions.length; i++) {
+                    let newX = tetro.positions[i][0] + tetro.tl[0] + x;
+                    let newY = tetro.positions[i][1] + tetro.tl[1] + y;
+
+                    if (newY >= hTile || newX < 0 || newX >= wTile || (newY >= 0 && gameArray[newY][newX] != null)) {
+                        return true; // Collision with something other than a wall
+                    }
+                }
+                return false;
+            }
+
+            const wallKickData = {
+                "0>>1": [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+                "1>>0": [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+                "1>>2": [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+                "2>>1": [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+                "2>>3": [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+                "3>>2": [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+                "3>>0": [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+                "0>>3": [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+            };
+
+            const wallKickDataI = {
+                "0>>1": [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+                "1>>0": [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+                "1>>2": [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
+                "2>>1": [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+                "2>>3": [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+                "3>>2": [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+                "3>>0": [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+                "0>>3": [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]]
+            };
+
+
+            function rotate(mode = "cw") {
+
+                if (currentTetro.name === "o") {
+                    return;
+                }
+                const rotateS = new Audio('rotate.mp3');
+                if (musicOn) {
+                    rotateS.play();
+                }
+                // Save the current positions before rotating
+                let oldPos = JSON.parse(JSON.stringify(currentTetro.positions));
+                let oldTl = JSON.parse(JSON.stringify(currentTetro.tl));
+                let oldOrientation = currentTetro.orientation;
+
+                // Rotate the tetromino points
+                rotatePointsCw(mode);
+
+                let currentRotate = oldOrientation;
+                let nextRotate = currentTetro.orientation;
+
+                let identifier = `${currentRotate}>>${nextRotate}`;
+                // Wall kicks
+                let kickApplied = false;
+
+                // redundant for 0...
+                for (let i = 0; i < 5; i++) {
+                    let kickX;
+                    let kickY;
+                    if (currentTetro.name == "i") {
+                        kickX = wallKickDataI[identifier][i][0];
+                        kickY = wallKickDataI[identifier][i][1];
+                    } else {
+                        kickX = wallKickData[identifier][i][0];
+                        kickY = wallKickData[identifier][i][1];
+                    }
+                    if (checkCollision(currentTetro, kickX, kickY) === false) {
+                        currentTetro.tl[0] += kickX;
+                        currentTetro.tl[1] += kickY;
+                        kickApplied = true;
+                        break;
+                    }
+                }
+
+                if (!kickApplied) {
+                    // Revert to original position and orientation if no kicks work
+                    currentTetro.positions = oldPos;
+                    currentTetro.tl = oldTl;
+                    currentTetro.orientation = oldOrientation;
+                    // try counterclockwise
+                }
+                resetSoftLock();
+
+
+            }
+
+            function rotatePointsCw(mode) {
+                let centerX = 0;
+                let centerY = 0;
+
+                switch (currentTetro.name) {
+                    case "j":
+                    case "l":
+                    case "s":
+                    case "z":
+                    case "t":
+                        centerX = 1;
+                        centerY = 1;
+                        break;
+                    case "i":
+                        centerX = 1.5;
+                        centerY = 1.5;
+                        break;
+                    default:
+                        break;
+                }
+
+                for (let i = 0; i < currentTetro.positions.length; i++) {
+                    let x = currentTetro.positions[i][0] - centerX;
+                    let y = currentTetro.positions[i][1] - centerY;
+                    let x2;
+                    let y2;
+                    if (mode == "cw") {
+                        x2 = -y;
+                        y2 = x;
+                    } else {
+                        x2 = y;
+                        y2 = -x;
+                    }
+                    currentTetro.positions[i][0] = Math.round(x2 + centerX);
+                    currentTetro.positions[i][1] = Math.round(y2 + centerY);
+                }
+                if (mode == "cw") {
+                    currentTetro.orientation = (currentTetro.orientation + 1) % 4;
+                } else {
+                    currentTetro.orientation = (currentTetro.orientation + 3) % 4;
+                }
+
+            }
+
+
+            // ----- DRAWING
+
+
+            function drawSquare(x, y, color, transparency = 1, s1 = bs, glow = 0) {
+                const imgX = x;
+                const imgY = y;
+
+                if (glow > 0) {
+                    ctx.shadowBlur = 100;
+                }
+
+
+                ctx.globalAlpha = glow / 2;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = color;
+                ctx.fillRect(imgX, imgY, s1, s1);
+                ctx.globalAlpha = 1 * transparency; // Transparency of the tint
+
+                ctx.fillRect(imgX, imgY, s1, s1);
+
+                // Reset composite operation and alpha
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = 1.0;
+                ctx.shadowBlur = 0;
+            }
+
+
+
+
+
+            function drawTetromino(tetromino) {
+
+                if (tetromino == null) return;
+                ctx.beginPath();
+                ctx.globalAlpha = soft;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = tetromino.color;
+                for (let i = 0; i < tetromino.positions.length; i++) {
+                    const [x, y] = tetromino.positions[i];
+                    ctx.rect((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], bs, bs)
+                }
+                ctx.closePath();
+                ctx.fill()
+                ctx.globalAlpha = 0;
+
+                // Draw ghost tetromino
+                let ghost = JSON.parse(JSON.stringify(tetromino));
+                calcGhost(ghost);
+
+                ctx.globalAlpha = 0.2;
+                ctx.fillStyle = tetromino.color;
+                for (let i = 0; i < ghost.positions.length; i++) {
+                    const [x, y] = ghost.positions[i];
+                    ctx.rect((x + ghost.tl[0]) * bs + startingPositions[0], (y + ghost.tl[1]) * bs + startingPositions[1], bs, bs)
+                }
+                ctx.closePath();
+                ctx.fill()
+
+            }
+
+            function drawNext(tetromino, a, b) {
+
+                if (tetromino == null) return;
+
+                ctx.beginPath();
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = tetromino.color;
+                for (let i = 0; i < tetromino.positions.length; i++) {
+                    const [x, y] = tetromino.positions[i];
+                    ctx.rect(x * bs + a, y * bs + b, bs, bs)
+
+                }
+                ctx.closePath();
+                ctx.fill()
+            }
+
+            let drawInterval;
+
+            let clearLineTime = 250;
+
+
+            const speedTable = {
+                0: 860, //799,
+                1: 715,
+                2: 632,
+                3: 549,
+                4: 466,
+                5: 383,
+                6: 300,
+                7: 216,
+                8: 133,
+                9: 100,
+                10: 83,
+                11: 83,
+                12: 83,
+                13: 67,
+                14: 67,
+                15: 67,
+                16: 50,
+                17: 50,
+                18: 50,
+                19: 33,
+                20: 33,
+                21: 33,
+                22: 33,
+                23: 33,
+                24: 33,
+                25: 33,
+                26: 33,
+                27: 33,
+                28: 33,
+                29: 20
+            };
+
+            let messageDelay = 1000;
+            let message = "";
+            let points = "";
+            let messageRemoveTimeout;
+
+            function messageRemove() {
+                setTimeout(() => {
+                    message = "";
+                    points = "";
+                }, messageDelay);
+            }
+
+            function messageCh(m, p) {
+                if (message != "") {
+                    clearTimeout(messageRemoveTimeout);
+                    // new timeout
+                }
+                message = m;
+                points = p;
+                messageRemoveTimeout = setTimeout(messageRemove, messageDelay);
+            }
+
+
+            function drawScore() {
+                ctx.textAlign = "left";
+                const fontSize = Math.min(cw, ch) / 26; // Adjust the font size dynamically
+                ctx.font = `${fontSize}px Fira Sans Condensed`;
+                ctx.fillStyle = "white";
+
+                const xPos = startingPositions[0] - bs * 5
+                const yPosStart = ch * 0.5;
+                const lineHeight = fontSize * 1.5; // Line height based on the font size
+
+                ctx.fillText("Score: ", xPos, yPosStart);
+                ctx.fillText(score, xPos, yPosStart + lineHeight);
+                ctx.fillText("Level: " + level, xPos, yPosStart + 2 * lineHeight);
+                ctx.fillText("Lines: " + lines, xPos, yPosStart + 3 * lineHeight);
+
+            }
+
+            function draw() {
+
+                drawFrame()
+
+                if (paused) { ctx.filter = "blur(16px)" }
+                // Draw tetrominoes from the array
+                for (let i = 0; i < hTile; i++) {
+                    for (let j = 0; j < wTile; j++) {
+                        if (gameArray[i][j] == null) {
+                        } else {
+                            drawSquare(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color)
+                        }
+                    }
+                }
+
+                drawTetromino(currentTetro);
+
+                ctx.filter = "blur(0px)"
+                // Draw message and points
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+
+
+                ctx.globalAlpha = 0.5;
+                ctx.fillText(message, startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 - 30);
+                ctx.fillText(points != "" ? "+" + points : "", startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 + 10);
+                ctx.globalAlpha = 1;
+            }
+
+
+
+            document.addEventListener('keydown', keyDownHandler, false);
+
+            function keyDownHandler(e) {
+                e.preventDefault();
+
+                if (e.key === "a") {
+                    clearInterval(drawInterval);
+                    resetSoftLock();
+                    stop();
+                    startGame()
+                    //countdown();
+                }
+                if (e.key === "Escape") {
+                    pauseGame();
+                }
+                if (e.key === " " || e.key === "Spacebar") {
+                    hardDrop()
+                }
+                if (paused) {
+                    return
+                }
+
+                if (e.key === "Right" || e.key === "ArrowRight") {
+                    moveRight()
+                }
+                if (e.key === "Left" || e.key === "ArrowLeft") {
+                    moveLeft()
+                }
+                if (e.key === "Down" || e.key === "ArrowDown") {
+                    dropButton();
+                }
+                if (e.key === "Up" || e.key === "ArrowUp") {
+                    rotate();
+                }
+
+                if (e.key === "c") {
+                    holdTetro();
+                }
+                if (e.key === "x") {
+                    rotate();
+                }
+                if (e.key === "z") {
+                    rotate("ccw");
+                }
+                if (e.key === "m") {
+                    messageCh(musicOn ? "Muted" : "Unmuted", "")
+                    muteGame();
+                }
+            }
+
+
+
+            // ----------------------- shuffle array
+            function shuffleArray(array) {
+                for (var i = array.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    var temp = array[i];
+                    array[i] = array[j];
+                    array[j] = temp;
+                }
+            }
+
+            let paused = false;
+            function pauseGame() {
+
+                if (paused) {
+                    paused = false;
+                    const startm = new Audio('start.mp3');
+                    resetSoftLock();
+                    countdown(() => {
+                        resume()
+                        musicOn ? startm.play() : null;
+                        drawInterval = setInterval(draw, 16)
+                    })
+
+                } else {
+
+                    paused = true;
+                    draw();
+                    const pause = new Audio('pause.mp3');
+                    musicOn ? pause.play() : null;
+                    ctx.fillStyle = "white";
+                    ctx.textAlign = "center";
+                    resetSoftLock();
+                    ctx.fillText("Paused...", cw / 2, (ch - subbar) / 2 - 30);
+                    stop()
+                    clearInterval(drawInterval)
+
+                }
+            }
+
+            function muteGame() {
+                musicOn = !musicOn;
+            }
+
+
+            drawFrame()
+            ctx.fillStyle = "white";
+            ctx.textAlign = "center";
+            fontSize = Math.min(cw, ch) / 25;
+            ctx.font = `${fontSize}px Fira Sans Condensed`;
+            ctx.fillText("Press 'a' to start...", cw / 2, (ch - subbar) / 2 - 30);
+
+
+
+        });
+
+
+
+        const blockImage = new Image();
+        blockImage.src = "block.png"
+        const back = new Image();
+        back.src = ""
+
+    </script>
+</body>
+
+</html>

@@ -57,7 +57,6 @@
         <canvas id="myCanvas" width="900" height="1600"></canvas>
     </div>
 
-    <script src="glfx.js"></script>
     <script>
 
         document.addEventListener("DOMContentLoaded", function () {
@@ -102,7 +101,7 @@
             let cw = canvas.width;
 
             const subbar = ch * 0.20;
-            let startingPositions = [15, 20]
+            let startingPositions = [30, 30]
             const bs = (ch - startingPositions[0] * 2 - subbar) / hTile; // size
 
             let speed;
@@ -120,8 +119,6 @@
 
             let dash = 0;
             let dashPos = [];
-
-
 
             let musicOn = true;
 
@@ -197,8 +194,6 @@
                 }, Math.floor(1000 / 40));
             }
 
-
-
             // with default positions
             const tetrominos = [
                 { name: "i", tl: [0, 0], positions: [[0, 1], [1, 1], [2, 1], [3, 1]], color: "cyan", orientation: 0 },
@@ -241,15 +236,9 @@
                 let occupiedCorners = 0;
                 if (currentTetro.name === "t") {
 
-
                     if (checkCollision(currentTetro, 0, 1) && checkCollision(currentTetro, 0, -1) && checkCollision(currentTetro, 1, 0) && checkCollision(currentTetro, -1, 0)) {
                         occupiedCorners = 3;
                     }
-
-                    console.log(checkCollision(currentTetro, 0, 1))
-                    console.log(checkCollision(currentTetro, 1, 0))
-                    console.log(checkCollision(currentTetro, 0, -1))
-                    console.log(checkCollision(currentTetro, -1, 0))
 
                     /*
                     corner1 = [tl[0], tl[1]];
@@ -268,9 +257,8 @@
 
                 }
 
-                resetSoftLock();
+                
                 isSoftLocked = false; // Reset soft lock flag
-
                 for (let i = 0; i < currentTetro.positions.length; i++) {
                     const [x, y] = currentTetro.positions[i];
                     gameArray[y + currentTetro.tl[1]][x + currentTetro.tl[0]] = {
@@ -288,8 +276,9 @@
                 }
 
                 clearLine();
-                resetSoftLock();
-
+                clearInterval(gameInterval)
+                gameInterval = setInterval(drop, speed)
+                clearInterval(softAnimation);
 
                 // Check if the T-spin conditions are met
                 if (occupiedCorners >= 3) {
@@ -313,7 +302,8 @@
                         soft = 1;
                         clearInterval(gameInterval); // Stop the game interval
                         beginningToLock = setTimeout(lock, lockDelay);
-                        softAnimation = setInterval(softTrans, 16); // Start softness animation 
+                        softAnimation = setInterval(softTrans, 16); // Start softness animation
+                        gameInterval = setInterval(drop, speed)
                     }
                 } else {
                     currentTetro.tl[1] += 1;
@@ -523,9 +513,7 @@
                 const holdS = new Audio('hold.mp3');
                 musicOn ? holdS.play() : null;
 
-
                 resetSoftLock();
-
 
                 let temp = currentTetro;
 
@@ -541,21 +529,16 @@
             }
 
             function popQueue() {
-                console.log("popqueue called")
+
                 resetSoftLock();
 
-                if (bag.length === 0) {
-                    bag = JSON.parse(JSON.stringify(tetrominos));
-                    shuffleArray(bag);
+                if (bag.length == 1) {
+                    bag2 = JSON.parse(JSON.stringify(tetrominos));
+                    shuffleArray(bag2);
+                    bag = bag + bag2
                 }
-                currentTetro = nextTetro;
-                nextTetro = bag.pop();
-                // set position
-                // first iteration
-                if (currentTetro == null) {
-                    currentTetro = nextTetro;
-                    nextTetro = bag.pop();
-                }
+                currentTetro = bag.pop();
+   
                 if (checkCollision(currentTetro, 4, 0) != false) {
                     clearInterval(gameInterval);
                     gameInterval = null;
@@ -575,13 +558,16 @@
             }
 
             function endGame() {
+                clearInterval(gameInterval);
+                gameInterval = null;
+                clearInterval(drawInterval)
                 document.removeEventListener('keydown', keyDownHandler, false);
                 const failS = new Audio('fail.mp3');
                 musicOn ? failS.play() : null;
                 ctx.clearRect(0, 0, cw, ch);
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
-                ctx.shadowBlur = 2;
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "cyan"
                 ctx.fillText("Game Over", cw / 2, (ch - subbar) / 2 + ch * -0.10);
                 ctx.fillText("Final Score: " + score, cw / 2, (ch - subbar) / 2 + + ch * -0.07);
@@ -592,9 +578,7 @@
                 ctx.fillText("Highest Score: " + document.cookie, cw / 2, (ch - subbar) / 2 + ch * -0.04);
                 ctx.shadowBlur = 0;
                 drawStartButton();
-                clearInterval(gameInterval);
-                gameInterval = null;
-                clearInterval(drawInterval)
+         
             }
 
 
@@ -689,6 +673,8 @@
 
             }
 
+
+
             function rotatePointsCw(mode) {
                 let centerX = 0;
                 let centerY = 0;
@@ -763,7 +749,7 @@
                 ctx.globalAlpha = 0.3;
                 ctx.lineWidth = 2; // Width of the outline
                 ctx.strokeStyle = color;
-                ctx.shadowBlur = 2; // Adjust the blur radius for the glow effect
+                ctx.shadowBlur = 0; // Adjust the blur radius for the glow effect
                 ctx.shadowColor = color; // The color of the glow
                 ctx.strokeRect(x, y, s1, s1);
 
@@ -785,6 +771,7 @@
                 // Draw the block image
                 ctx.globalAlpha = 1;
                 ctx.drawImage(back, x + startingPositions[0], y + startingPositions[1], bs, bs);
+
             }
 
             function drawTetromino(tetromino) {
@@ -792,7 +779,8 @@
                     const x = tetromino.positions[i][0];
                     const y = tetromino.positions[i][1];
                     drawSquare((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color, soft);
-                    drawOutline((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color);
+                    //drawOutline((x + tetromino.tl[0]) * bs + startingPositions[0], (y + tetromino.tl[1]) * bs + startingPositions[1], tetromino.color);
+
                 }
 
                 // Draw ghost tetromino
@@ -800,9 +788,8 @@
                 calcGhost(ghost);
 
                 for (let i = 0; i < ghost.positions.length; i++) {
-                    drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color, 0.);
-                    drawOutline((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color);
-
+                    drawSquare((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color, 0.2);
+                    //drawOutline((ghost.positions[i][0] + ghost.tl[0]) * bs + startingPositions[0], (ghost.positions[i][1] + ghost.tl[1]) * bs + startingPositions[1], ghost.color);
                 }
             }
 
@@ -812,7 +799,7 @@
 
                 for (let i = 0; i < tetromino.positions.length; i++) {
                     const [x, y] = tetromino.positions[i];
-                    drawSquare(x * (bs / 1.25) + a, y * (bs / 1.25) + b, tetromino.color, 1, bs / 1.25);
+                    drawSquare(x * bs + a, y * bs + b, tetromino.color, 1, bs);
                 }
 
             }
@@ -920,7 +907,7 @@
                 const xPos = cw * 0.75; // Position the score text dynamically
                 const yPosStart = ch * 0.5;
                 const lineHeight = fontSize * 1.5; // Line height based on the font size
-                ctx.shadowBlur = 2;
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "cyan"
                 ctx.fillText("Score: ", xPos, yPosStart);
                 ctx.fillText(score, xPos, yPosStart + lineHeight);
@@ -936,7 +923,7 @@
 
                 // Draw outline for Tetris matrix
                 ctx.strokeStyle = "cyan";
-                ctx.shadowBlur = 20;
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "cyan"
 
                 ctx.lineWidth = matrixOutlineWidth;
@@ -957,7 +944,7 @@
                             drawBackground(j * bs, i * bs);
                         } else {
                             drawSquare(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
-                            drawOutline(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
+                            //drawOutline(j * bs + startingPositions[0], i * bs + startingPositions[1], gameArray[i][j].color);
 
                         }
                     }
@@ -974,11 +961,9 @@
                 // Draw next tetromino
                 ctx.fillStyle = "white";
                 ctx.textAlign = "left";
-                const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
-                ctx.font = `${fontSize}px Roboto`;
-                ctx.shadowBlur = 2;
-                ctx.shadowColor = "cyan"
-                ctx.fillText("Next: ", cw * 0.75, ch * 0.05);
+
+                ctx.font = `${fontSize}px Helvetica`;
+                ctx.fillText("Next: ", cw / 2 + wTile*bs/2, ch * 0.05);
                 ctx.fillText("Hold: ", cw * 0.75, ch * 0.25);
                 ctx.shadowBlur = 0;
                 drawNext(nextTetro, cw * 0.75, ch * 0.07);
@@ -989,10 +974,10 @@
                 // Draw message and points
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "green";
                 ctx.globalAlpha = 0.5;
-                ctx.shadowBlur = 40;
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "cyan";
                 ctx.fillText(message, startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 - 30);
                 ctx.fillText(points != "" ? "+" + points : "", startingPositions[0] + bs * wTile / 2, startingPositions[1] + (ch - subbar) / 2 + 10);
@@ -1065,11 +1050,9 @@
                     ctx.fillText(button.label, x + buttonWidth / 2, y + buttonHeight / 2);
                     ctx.fillStyle = buttonColor;  // Reset fill color for next button
                 });
+
                 drawPauseButton();
-
             }
-
-
 
             // Add event listeners for touch events
             canvas.addEventListener("touchstart", function (event) {
@@ -1171,7 +1154,7 @@
                 ctx.fillStyle = "black";
                 const fontSize = Math.min(cw, ch) / 20; // Adjust the font size dynamically
                 ctx.font = `${fontSize}px Arial`;
-                ctx.shadowBlur = 40;
+                ctx.shadowBlur = 0;
                 ctx.shadowColor = "cyan";
                 ctx.drawImage(buttonImage, (cw - buttonWidth) / 2, (ch - buttonHeight) / 2, buttonWidth, buttonHeight);
 
@@ -1238,7 +1221,6 @@
                 ctx.fillText("⏸️", pauseButtonX + buttonWidth / 4, pauseButtonY + buttonHeight / 2);
             }
 
-
             // Function to check if a point is inside a button
             function isInsideButton(x, y, buttonX, buttonY, buttonWidth, buttonHeight) {
                 return x > buttonX && x < buttonX + buttonWidth && y > buttonY && y < buttonY + buttonHeight;
@@ -1278,7 +1260,6 @@
                 if (e.key === "a") {
                     clearInterval(gameInterval)
                     clearInterval(drawInterval);
-                    resetSoftLock();
                     startGame();
                 }
                 if (e.key === "Escape") {
@@ -1288,7 +1269,6 @@
                     muteGame();
                 }
             }
-
 
 
             // ----------------------- shuffle array
@@ -1310,7 +1290,7 @@
                     gameInterval = setInterval(drop, speed)
                     drawInterval = setInterval(draw, 16)
                 } else {
-                    ctx.shadowBlur = 2;
+                    ctx.shadowBlur = 0;
                     ctx.shadowColor = "cyan"
                     paused = true;
                     const pause = new Audio('pause.mp3');
@@ -1322,7 +1302,7 @@
                     clearInterval(gameInterval);
                     clearInterval(drawInterval)
                     ctx.shadowBlur = 0
-                    drawButtons();
+                    drawPauseButton();
                 }
             }
 
